@@ -9,9 +9,9 @@
 
 이게 안 되면 나머지가 다 돼도 도구는 실패다.
 
-- 🚧 **핵심** — 새로 띄운 서버의 **spawn 자식 세션에서 폰으로 `SendUserFile`이 실제 도착**한다. env 절대 규칙(`CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE=1`)의 존재 이유. "환경변수 넣었으니 되겠지"로 통과시키지 않는다 — 실제 파일 도착으로만 판정.
-  - **자동 실증 완료**: 가짜 `claude`로 자식이 받는 env를 캡처 → `CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE=1` 주입·금지키 제거·인자·cwd 확인.
-  - **수동 검증 대기**: 실제 `claude`로 `crc up` → 폰 앱에 `SendUserFile` 파일 실제 도착 확인. 이걸로만 최종 통과.
+- ✅ **핵심** — 새로 띄운 서버의 **spawn 자식 세션에서 폰으로 `SendUserFile`이 실제 도착**한다. env 절대 규칙(`CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE=1`)의 존재 이유.
+  - **자동 실증**: 가짜 `claude`로 자식이 받는 env를 캡처 → `CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE=1` 주입·금지키 제거·인자·cwd 확인.
+  - **실기기 검증 완료**: `crc up`으로 이 저장소를 띄우고 폰 앱에서 자식 세션 생성 → `SendUserFile`로 README 전송 → 폰에 파일 도착·미리보기 확인. "환경변수 넣었으니 되겠지"가 아니라 실제 도착으로 통과.
 - ✅ 등록한 서버의 상태(running/stopped/dead)가 실제 프로세스와 일치. (실제 프로세스로 up→running→down→stopped, 죽은 pid→dead 검증)
 
 ## 명령 명세
