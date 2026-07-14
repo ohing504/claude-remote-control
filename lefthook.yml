@@ -1,0 +1,27 @@
+# git 훅. 설치(clone 후 1회): make setup  (또는 lefthook install)
+# 스킵: LEFTHOOK=0 git commit  /  LEFTHOOK_EXCLUDE=lint git commit
+pre-commit:
+  parallel: true
+  commands:
+    fmt:
+      glob: "*.go"
+      run: golangci-lint fmt {staged_files}
+      stage_fixed: true # 포맷된 파일 재-git add
+    lint:
+      glob: "*.go"
+      # 전체 실행 — golangci-lint는 파일 목록이 여러 디렉토리에 걸치면 거부하고,
+      # 캐시로 미변경 패키지는 건너뛰므로 소규모에선 이게 더 빠르고 정확하다.
+      run: golangci-lint run ./...
+
+pre-push:
+  parallel: true
+  commands:
+    build:
+      glob: "*.go"
+      run: go build ./...
+    lint-all:
+      glob: "*.go"
+      run: golangci-lint run ./...
+    test:
+      glob: "*.go"
+      run: go test ./...

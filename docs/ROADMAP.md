@@ -6,8 +6,10 @@
 
 ## 진행
 
-- [ ] **M0 · 스캐폴드** — `go mod` 초기화, config 로드/저장(`workspaces.json`).
-  - 검증: `crc ls` 빈 목록 → `crc add` 후 목록에 반영.
+- [x] **M0 · 스캐폴드** — `go mod` 초기화, config 로드/저장(`workspaces.json`).
+  - 검증: `crc ls` 빈 목록 → `crc add` 후 목록에 반영. ✅ 통과.
+- [x] **M0.5 · 품질 인프라** — golangci-lint v2(+gofumpt)·lefthook·Makefile, config 유닛테스트. CI는 생략(로컬 pre-push가 게이트, GitHub Actions 무료티어 절약). 레시피 SSOT: Wiki `go-project-quality-setup`.
+  - 검증: `make check`(fmt·lint·test·build) 전부 통과, pre-commit 훅에서 fmt+lint 실동작. ✅ 통과.
 - [ ] **M1 · 등록 CRUD** — `add`/`rm`/`ls`, 중복·경로 유효성 검증.
   - 검증: 잘못된 경로·중복 이름 거부, 정상 등록·삭제 반영.
 - [ ] **M2 · 생명주기 (핵심)** — `up`/`down`/`status`, env 절대 규칙 주입.

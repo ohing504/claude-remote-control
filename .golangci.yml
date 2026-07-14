@@ -1,0 +1,35 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - revive # style/naming
+    - misspell # 오타
+    - errorlint # 에러 래핑(errors.Is/As, %w)
+    - bodyclose
+    - unconvert
+    - copyloopvar # 루프변수 풋건 (Go 1.22+)
+    - gosec # public repo면 값싼 보안
+  exclusions:
+    presets:
+      - comments
+      - std-error-handling
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+
+formatters:
+  enable:
+    - gofumpt # 엄격 gofmt 상위집합
+    - goimports # import 그룹 + add/remove
+  settings:
+    gofumpt:
+      # 모듈 경로를 알려줘야 로컬 import 그룹을 goimports와 동일하게 판정(둘의 충돌 방지)
+      module-path: crc
+    goimports:
+      local-prefixes:
+        - crc
