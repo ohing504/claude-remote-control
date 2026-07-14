@@ -1,0 +1,45 @@
+# 등록 CRUD의 CLI 표면(add/rm/ls) E2E. 프로세스 기동(up/down)은 claude 의존이라 유닛·통합 테스트가 담당.
+
+# 처음엔 빈 목록
+exec crc ls
+stdout '등록된 워크스페이스 없음'
+
+# 없는 경로는 거부
+! exec crc add ./nope
+stderr '경로가 존재하지 않음'
+
+# 파일(디렉토리 아님)은 거부
+exec touch afile
+! exec crc add afile
+stderr '디렉토리가 아님'
+
+# 정상 등록
+mkdir ws-a
+exec crc add ws-a proj-a
+stdout '등록: proj-a'
+
+# 목록에 반영(상태 stopped)
+exec crc ls
+stdout 'proj-a'
+stdout 'stopped'
+
+# 이름 중복 거부
+mkdir ws-b
+! exec crc add ws-b proj-a
+stderr '이미 등록된 이름'
+
+# 경로 중복 거부(다른 이름)
+! exec crc add ws-a other
+stderr '이미 등록된 경로'
+
+# 없는 이름 삭제는 에러
+! exec crc rm nope
+stderr '등록되지 않은 이름'
+
+# 정상 삭제
+exec crc rm proj-a
+stdout '삭제: proj-a'
+
+# 다시 빈 목록
+exec crc ls
+stdout '등록된 워크스페이스 없음'

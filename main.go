@@ -1,5 +1,5 @@
 // crc: 여러 claude remote-control 서버를 한 화면에서 켜고·끄고·상태 보는 TUI.
-// M0에서는 config 로드/저장과 ls·add 명령만 제공한다.
+// TUI(무인자 실행)는 M4. 그전까지는 서브커맨드로 조작한다.
 package main
 
 import (
@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 
 	"crc/internal/config"
+	"crc/internal/server"
+	"crc/internal/state"
 )
 
 func main() {
@@ -29,6 +31,12 @@ func run(args []string) error {
 		return cmdAdd(args[1:])
 	case "rm":
 		return cmdRm(args[1:])
+	case "up":
+		return cmdUp(args[1:])
+	case "down":
+		return cmdDown(args[1:])
+	case "status":
+		return cmdStatus()
 	case "-h", "--help", "help":
 		return cmdUsage()
 	default:
@@ -40,9 +48,12 @@ func cmdUsage() error {
 	fmt.Print(`crc — claude remote-control 매니저
 
 사용법:
-  crc ls                   등록된 워크스페이스 목록
+  crc ls                   등록된 워크스페이스 목록 + 상태
   crc add <path> [name]    워크스페이스 등록 (name 기본 basename)
-  crc rm <name>            워크스페이스 등록 삭제
+  crc rm <name>            워크스페이스 등록 삭제 (실행 중이면 정지 후)
+  crc up   [name...]       서버 시작 (없으면 전체)
+  crc down [name...]       서버 정지 (없으면 전체)
+  crc status               전체 상태 판정
 `)
 	return nil
 }
@@ -56,8 +67,13 @@ func cmdLs() error {
 		fmt.Println("(등록된 워크스페이스 없음)")
 		return nil
 	}
+	dir, err := state.Dir() // 없어도 됨 — 상태 파일 없으면 stopped로 판정
+	if err != nil {
+		return err
+	}
 	for _, ws := range cfg.Workspaces {
-		fmt.Printf("%-20s %s\n", ws.Name, ws.Path)
+		st := server.Status(state.PidPath(dir, ws.Name))
+		fmt.Printf("%-20s %-8s %s\n", ws.Name, st, ws.Path)
 	}
 	return nil
 }
@@ -99,6 +115,20 @@ func cmdRm(args []string) error {
 	if err != nil {
 		return err
 	}
+	if cfg.Find(name) == nil {
+		return fmt.Errorf("등록되지 않은 이름: %s", name)
+	}
+	// 실행 중이면 먼저 정지한다(고아 프로세스·pid 잔재 방지).
+	dir, err := state.Dir()
+	if err != nil {
+		return err
+	}
+	if server.Status(state.PidPath(dir, name)) == server.Running {
+		if err := server.StopByName(dir, name); err != nil {
+			return err
+		}
+		fmt.Printf("정지: %s\n", name)
+	}
 	if err := cfg.Remove(name); err != nil {
 		return err
 	}
@@ -106,5 +136,87 @@ func cmdRm(args []string) error {
 		return err
 	}
 	fmt.Printf("삭제: %s\n", name)
+	return nil
+}
+
+// resolveTargets는 인자 이름들을 워크스페이스로 해석한다. 인자가 없으면 전체.
+func resolveTargets(cfg *config.Config, names []string) ([]config.Workspace, error) {
+	if len(names) == 0 {
+		return cfg.Workspaces, nil
+	}
+	out := make([]config.Workspace, 0, len(names))
+	for _, n := range names {
+		ws := cfg.Find(n)
+		if ws == nil {
+			return nil, fmt.Errorf("등록되지 않은 이름: %s", n)
+		}
+		out = append(out, *ws)
+	}
+	return out, nil
+}
+
+func cmdUp(names []string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	targets, err := resolveTargets(cfg, names)
+	if err != nil {
+		return err
+	}
+	dir, err := state.EnsureDir()
+	if err != nil {
+		return err
+	}
+	for _, ws := range targets {
+		s := server.Server{Name: ws.Name, Path: ws.Path}
+		if err := s.Start(dir); err != nil {
+			fmt.Fprintf(os.Stderr, "  %s: %v\n", ws.Name, err)
+			continue
+		}
+		fmt.Printf("시작: %s\n", ws.Name)
+	}
+	return nil
+}
+
+func cmdDown(names []string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	targets, err := resolveTargets(cfg, names)
+	if err != nil {
+		return err
+	}
+	dir, err := state.Dir()
+	if err != nil {
+		return err
+	}
+	for _, ws := range targets {
+		if server.Status(state.PidPath(dir, ws.Name)) != server.Running {
+			continue // 안 떠 있으면 조용히 건너뜀
+		}
+		if err := server.StopByName(dir, ws.Name); err != nil {
+			fmt.Fprintf(os.Stderr, "  %s: %v\n", ws.Name, err)
+			continue
+		}
+		fmt.Printf("정지: %s\n", ws.Name)
+	}
+	return nil
+}
+
+func cmdStatus() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	dir, err := state.Dir()
+	if err != nil {
+		return err
+	}
+	for _, ws := range cfg.Workspaces {
+		st := server.Status(state.PidPath(dir, ws.Name))
+		fmt.Printf("%-20s %s\n", ws.Name, st)
+	}
 	return nil
 }

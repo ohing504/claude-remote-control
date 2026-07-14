@@ -9,8 +9,10 @@
 
 이게 안 되면 나머지가 다 돼도 도구는 실패다.
 
-- ⬜ **핵심** — 새로 띄운 서버의 **spawn 자식 세션에서 폰으로 `SendUserFile`이 실제 도착**한다. env 절대 규칙(`CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE=1`)의 존재 이유. "환경변수 넣었으니 되겠지"로 통과시키지 않는다 — 실제 파일 도착으로만 판정. (M2)
-- ⬜ 등록한 서버의 상태(running/stopped/dead)가 실제 프로세스와 일치. (M2·M4)
+- 🚧 **핵심** — 새로 띄운 서버의 **spawn 자식 세션에서 폰으로 `SendUserFile`이 실제 도착**한다. env 절대 규칙(`CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE=1`)의 존재 이유. "환경변수 넣었으니 되겠지"로 통과시키지 않는다 — 실제 파일 도착으로만 판정.
+  - **자동 실증 완료**: 가짜 `claude`로 자식이 받는 env를 캡처 → `CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE=1` 주입·금지키 제거·인자·cwd 확인.
+  - **수동 검증 대기**: 실제 `claude`로 `crc up` → 폰 앱에 `SendUserFile` 파일 실제 도착 확인. 이걸로만 최종 통과.
+- ✅ 등록한 서버의 상태(running/stopped/dead)가 실제 프로세스와 일치. (실제 프로세스로 up→running→down→stopped, 죽은 pid→dead 검증)
 
 ## 명령 명세
 
@@ -31,7 +33,7 @@
 | 규칙 | 동작 | 상태 |
 |---|---|---|
 | 존재 검증 | 없는 name이면 에러 | ✅ |
-| 실행 중 처리 | 떠 있는 서버는 정지 후 삭제(또는 거부) — M2에서 확정 | ⬜ M2 |
+| 실행 중 처리 | 떠 있으면 정지 후 삭제 | ✅ |
 | 삭제 반영 | workspaces.json에서 제거 | ✅ |
 
 ### `crc ls`
@@ -40,33 +42,33 @@
 | 규칙 | 동작 | 상태 |
 |---|---|---|
 | 빈 목록 | `(등록된 워크스페이스 없음)` | ✅ |
-| 목록 | `<name>  <path>` 한 줄씩 | ✅ |
-| 상태 열 | running/stopped/dead 표기 | ⬜ M2 |
+| 목록 | `<name>  <status>  <path>` 한 줄씩 | ✅ |
+| 상태 열 | running/stopped/dead 표기 | ✅ |
 
 ### `crc up [name...]`
 서버 시작. 인자 없으면 전체.
 
 | 규칙 | 동작 | 상태 |
 |---|---|---|
-| env 절대 규칙 | `CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE=1` 주입 | ⬜ M2 |
-| detached 실행 | `Setsid`로 부모 죽어도 생존, 로그 파일로 리다이렉트 | ⬜ M2 |
-| PID 기록 | `<name>.pid` 기록 | ⬜ M2 |
-| 이미 실행 중 | 중복 기동 안 함(no-op 또는 안내) | ⬜ M2 |
+| env 절대 규칙 | `CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE=1` 주입 + 금지키 `CLAUDE_CODE_REMOTE` 제거 | ✅ |
+| detached 실행 | `Setsid`로 부모 죽어도 생존, 로그 파일로 리다이렉트 | ✅ |
+| PID 기록 | `<name>.pid` 기록 | ✅ |
+| 이미 실행 중 | 중복 기동 거부 | ✅ |
 
 ### `crc down [name...]`
 서버 정지. 인자 없으면 전체.
 
 | 규칙 | 동작 | 상태 |
 |---|---|---|
-| 정지 | SIGTERM → 잔존 시 SIGKILL | ⬜ M2 |
-| pid 정리 | `<name>.pid` 삭제 | ⬜ M2 |
+| 정지 | SIGTERM → 잔존 시 SIGKILL | ✅ |
+| pid 정리 | `<name>.pid` 삭제 | ✅ |
 
 ### `crc status`
 전체 상태 판정 출력.
 
 | 규칙 | 동작 | 상태 |
 |---|---|---|
-| 판정 | `kill(pid,0)` → running/stopped/dead | ⬜ M2 |
+| 판정 | `kill(pid,0)` → running/stopped/dead | ✅ |
 
 ### `crc log <name>`
 로그 tail -f.
@@ -104,10 +106,9 @@ bubbletea 상태판.
 
 완료된 항목은 위 표에서 ✅로 바꾸고 여기서 줄을 삭제한다. 아래는 **미완료 작업의 구현 순서**.
 
-- **완료**: M0(스캐폴드·config·ls·add 최소), M0.5(품질 인프라: golangci-lint·lefthook·commit-msg 훅·config 테스트), M1(등록 CRUD: add 경로검증·경로중복, rm).
+- **완료**: M0(스캐폴드·config·ls·add), M0.5(품질 인프라: golangci-lint·lefthook·commit-msg 훅·테스트), M1(등록 CRUD), M2(생명주기 `up`/`down`/`status`·env 절대 규칙·상태 열·CLI E2E testscript). ※ M2 핵심 성공기준의 폰 도착 수동 검증만 남음(위 성공기준 참조).
 
-1. **M2 · 생명주기 (핵심)** — `up`/`down`/`status`, env 절대 규칙, rm 실행 중 처리. 검증: **spawn 자식에서 폰으로 `SendUserFile` 실제 도착으로만 통과.** CLI E2E `testscript` 도입.
-2. **M3 · 로그·포그라운드** — `log`(tail -f), `fg`. 검증: dead 원인이 로그에서 보임.
-3. **M4 · TUI** — 상태판·토글·로그뷰. 검증: 상태색이 실제 프로세스와 일치, ↵ 토글 동작.
-4. **M5 · CLAUDE.md 스캔 등록** — `scan`. 검증: CLAUDE.md 있는 디렉토리만, `.git`·`node_modules` 스킵.
-5. **M6 · 다듬기·설치** — 상태색·업타임·dead 정리, `go build`로 `~/.local/bin/crc` 설치. 검증: 설치 바이너리로 전체 흐름 재현.
+1. **M3 · 로그·포그라운드** — `log`(tail -f), `fg`. 검증: dead 원인이 로그에서 보임.
+2. **M4 · TUI** — 상태판·토글·로그뷰. 검증: 상태색이 실제 프로세스와 일치, ↵ 토글 동작.
+3. **M5 · CLAUDE.md 스캔 등록** — `scan`. 검증: CLAUDE.md 있는 디렉토리만, `.git`·`node_modules` 스킵.
+4. **M6 · 다듬기·설치** — 상태색·업타임·dead 정리, `go build`로 `~/.local/bin/crc` 설치. 검증: 설치 바이너리로 전체 흐름 재현.
