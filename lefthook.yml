@@ -1,5 +1,11 @@
 # git 훅. 설치(clone 후 1회): make setup  (또는 lefthook install)
 # 스킵: LEFTHOOK=0 git commit  /  LEFTHOOK_EXCLUDE=lint git commit
+commit-msg:
+  commands:
+    conventional:
+      # Conventional Commits 형식 검증({1} = 커밋 메시지 파일). 의존성 0 셸 훅.
+      run: sh .githooks/commit-msg-check.sh {1}
+
 pre-commit:
   parallel: true
   commands:
