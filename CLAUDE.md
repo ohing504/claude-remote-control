@@ -4,15 +4,17 @@
 
 여러 `claude remote-control` 서버를 한 화면에서 켜고·끄고·상태 보고·로그 보는 **Go 단일 바이너리 TUI**. 개발 착수 전 아래 문서를 먼저 읽는다.
 
-## 문서
+## 문서 (경계 분리)
 
-- **[README.md](README.md)** — 공개 얼굴: 왜 만드나·무엇을·설치·사용.
-- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — 설계·아키텍처 SSOT: 목표·성공기준·설계 결정·조사 결론·생명주기·명령 표면·TUI.
-- **[docs/ROADMAP.md](docs/ROADMAP.md)** — 구현 순서·진행 트래킹(M0~M6 체크박스, 마일스톤별 검증 기준).
+- **[README.md](README.md)** — 제품 SSOT: 왜·무엇·범위·비목표·설치·사용.
+- **[docs/SPEC.md](docs/SPEC.md)** — 기능 명세 SSOT: 명령별 규칙·검증·출력·에러 + 구현 상태 + 하단 우선순위(구현 순서). "뭐가 됐고 뭘 해야 하나"는 여기서 본다.
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — 순수 설계: 설계 결정·조사 결론·데이터 배치·생명주기·스캔 알고리즘.
+
+경계: 제품 사실→README / 기능 명세·상태→SPEC / 설계·구현 방식→ARCHITECTURE. 재서술 없이 서로 참조.
 
 ## 상태
 
-설계 단계, 코드 없음. `docs/ROADMAP.md`의 M0부터 순서로 구현한다.
+초기 구현 중. 현재 상태·다음 작업은 `docs/SPEC.md`(명령 표의 상태 + 하단 우선순위)가 SSOT.
 
 ## 개발 원칙 (ARCHITECTURE.md에서 발췌 — 어기면 안 되는 것)
 
@@ -26,4 +28,4 @@
 
 ## 개발 진행
 
-이 프로젝트는 새 세션에서 개발한다. 착수 시 `docs/ARCHITECTURE.md` → `docs/ROADMAP.md` M0부터. 개발기는 별도 개인 블로그(`~/workspace/portfolio`)에서 관리하므로 이 레포엔 두지 않는다.
+착수 시 `docs/SPEC.md`의 하단 우선순위에서 다음 마일스톤을 확인하고, 설계가 필요하면 `docs/ARCHITECTURE.md`를 참조한다. 개발기는 별도 개인 블로그(`~/workspace/portfolio`)에서 관리하므로 이 레포엔 두지 않는다.

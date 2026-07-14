@@ -2,7 +2,7 @@
 
 여러 프로젝트의 `claude remote-control` 서버를 한 화면에서 켜고·끄고·상태 보고·로그 보는 **Go 단일 바이너리 TUI**. tmux 등 런타임 의존성 없음.
 
-> **상태: 설계 단계 (구현 전).** 설계 결정과 그 근거는 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)가 SSOT.
+> **상태: 초기 구현 중.** 기능 명세·구현 상태는 [`docs/SPEC.md`](docs/SPEC.md), 설계 결정과 근거는 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)가 SSOT.
 
 ## 왜 만드나
 
@@ -27,6 +27,13 @@ $ crc
 ```
 
 등록한 워크스페이스 목록 + 실행 상태(running/stopped/dead)를 한 화면에. 키 하나로 서버를 켜고 끄고, 로그를 보고, 미심쩍을 땐 포그라운드로 띄운다.
+
+## 범위
+
+- **한다** — 프로젝트마다 하나씩 띄우는 remote-control 서버(보통 3~4개)의 등록·토글·상태·로그.
+- **안 한다(비목표)** — 로컬 TTY attach(조작은 폰·웹에서), 세션 내부 조작, tmux 대체 일반화.
+
+기능별 상세 명세와 구현 상태는 [`docs/SPEC.md`](docs/SPEC.md)가 SSOT.
 
 ## 왜 tmux가 아니라 Go 단일 바이너리인가
 
