@@ -58,6 +58,68 @@ func TestAddDuplicateNameRejected(t *testing.T) {
 	}
 }
 
+func TestAddDuplicatePathRejected(t *testing.T) {
+	cfg := &Config{}
+	if err := cfg.Add(Workspace{Name: "a", Path: "/same"}); err != nil {
+		t.Fatalf("첫 Add: %v", err)
+	}
+	// 이름이 달라도 경로가 같으면 거부.
+	if err := cfg.Add(Workspace{Name: "b", Path: "/same"}); err == nil {
+		t.Fatal("중복 경로 거부 기대, nil 반환")
+	}
+	if len(cfg.Workspaces) != 1 {
+		t.Fatalf("거부 후 1개 유지 기대, got %d", len(cfg.Workspaces))
+	}
+}
+
+func TestRemove(t *testing.T) {
+	cfg := &Config{Workspaces: []Workspace{{Name: "a", Path: "/a"}, {Name: "b", Path: "/b"}}}
+	if err := cfg.Remove("a"); err != nil {
+		t.Fatalf("Remove(a): %v", err)
+	}
+	if cfg.Find("a") != nil {
+		t.Fatal("a가 제거되지 않음")
+	}
+	if cfg.Find("b") == nil {
+		t.Fatal("b까지 사라짐")
+	}
+	if err := cfg.Remove("nope"); err == nil {
+		t.Fatal("없는 이름 Remove는 에러 기대")
+	}
+}
+
+func TestValidatePath(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "f.txt")
+	if err := os.WriteFile(file, []byte("x"), 0o600); err != nil {
+		t.Fatalf("픽스처 생성: %v", err)
+	}
+	tests := []struct {
+		name string
+		path string
+		ok   bool
+	}{
+		{"존재 디렉토리", dir, true},
+		{"없는 경로", filepath.Join(dir, "nope"), false},
+		{"파일(디렉토리 아님)", file, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			abs, err := ValidatePath(tc.path)
+			if tc.ok {
+				if err != nil {
+					t.Fatalf("통과 기대, err=%v", err)
+				}
+				if !filepath.IsAbs(abs) {
+					t.Fatalf("절대경로 기대, got %q", abs)
+				}
+			} else if err == nil {
+				t.Fatalf("거부 기대, abs=%q", abs)
+			}
+		})
+	}
+}
+
 func TestFind(t *testing.T) {
 	cfg := &Config{Workspaces: []Workspace{{Name: "x", Path: "/x"}}}
 	tests := []struct {

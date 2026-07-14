@@ -27,6 +27,8 @@ func run(args []string) error {
 		return cmdLs()
 	case "add":
 		return cmdAdd(args[1:])
+	case "rm":
+		return cmdRm(args[1:])
 	case "-h", "--help", "help":
 		return cmdUsage()
 	default:
@@ -40,6 +42,7 @@ func cmdUsage() error {
 사용법:
   crc ls                   등록된 워크스페이스 목록
   crc add <path> [name]    워크스페이스 등록 (name 기본 basename)
+  crc rm <name>            워크스페이스 등록 삭제
 `)
 	return nil
 }
@@ -63,7 +66,7 @@ func cmdAdd(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("경로가 필요합니다: crc add <path> [name]")
 	}
-	abs, err := filepath.Abs(args[0])
+	abs, err := config.ValidatePath(args[0])
 	if err != nil {
 		return err
 	}
@@ -83,5 +86,25 @@ func cmdAdd(args []string) error {
 		return err
 	}
 	fmt.Printf("등록: %s → %s\n", name, abs)
+	return nil
+}
+
+func cmdRm(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("이름이 필요합니다: crc rm <name>")
+	}
+	name := args[0]
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	if err := cfg.Remove(name); err != nil {
+		return err
+	}
+	if err := config.Save(cfg); err != nil {
+		return err
+	}
+	fmt.Printf("삭제: %s\n", name)
 	return nil
 }

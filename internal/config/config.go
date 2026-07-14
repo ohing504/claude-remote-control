@@ -104,11 +104,54 @@ func (c *Config) Find(name string) *Workspace {
 	return nil
 }
 
-// Add는 워크스페이스를 추가한다. 이름 중복이면 에러.
+// FindByPath는 경로로 워크스페이스를 찾는다. 없으면 nil.
+func (c *Config) FindByPath(path string) *Workspace {
+	for i := range c.Workspaces {
+		if c.Workspaces[i].Path == path {
+			return &c.Workspaces[i]
+		}
+	}
+	return nil
+}
+
+// Add는 워크스페이스를 추가한다. 이름 또는 경로가 중복이면 에러.
 func (c *Config) Add(ws Workspace) error {
 	if c.Find(ws.Name) != nil {
 		return errors.New("이미 등록된 이름: " + ws.Name)
 	}
+	if dup := c.FindByPath(ws.Path); dup != nil {
+		return errors.New("이미 등록된 경로: " + ws.Path + " (name=" + dup.Name + ")")
+	}
 	c.Workspaces = append(c.Workspaces, ws)
 	return nil
+}
+
+// Remove는 이름으로 워크스페이스를 제거한다. 없으면 에러.
+func (c *Config) Remove(name string) error {
+	for i := range c.Workspaces {
+		if c.Workspaces[i].Name == name {
+			c.Workspaces = append(c.Workspaces[:i], c.Workspaces[i+1:]...)
+			return nil
+		}
+	}
+	return errors.New("등록되지 않은 이름: " + name)
+}
+
+// ValidatePath는 경로를 절대경로로 정규화하고, 실제 존재하는 디렉토리인지 검증한다.
+func ValidatePath(path string) (string, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	info, err := os.Stat(abs)
+	if os.IsNotExist(err) {
+		return "", errors.New("경로가 존재하지 않음: " + abs)
+	}
+	if err != nil {
+		return "", err
+	}
+	if !info.IsDir() {
+		return "", errors.New("디렉토리가 아님: " + abs)
+	}
+	return abs, nil
 }
