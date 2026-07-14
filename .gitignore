@@ -1,0 +1,9 @@
+# build
+/crc
+/dist/
+
+# logs
+*.log
+
+# OS
+.DS_Store
