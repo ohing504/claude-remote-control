@@ -12,7 +12,15 @@ import (
 	"crc/internal/scan"
 )
 
-// enterAdd는 현재 폴더를 루트로 scan해 후보를 채우고 추가 화면으로 전환한다.
+// candsMsg는 백그라운드 스캔 결과다.
+type candsMsg struct{ cands []addCand }
+
+// scanCmd는 root 스캔을 goroutine으로 돌린다 — 넓은 트리(홈 등)에서 UI가 멈추지 않게.
+func scanCmd(root string) tea.Cmd {
+	return func() tea.Msg { return candsMsg{cands: loadCands(root)} }
+}
+
+// enterAdd는 현재 폴더를 루트로 추가 화면에 진입하고, 스캔은 백그라운드로 시작한다.
 func (m model) enterAdd() (tea.Model, tea.Cmd) {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -20,14 +28,15 @@ func (m model) enterAdd() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.addRoot = cwd
-	m.cands = loadCands(cwd)
+	m.cands = nil
+	m.scanning = true
 	m.mode = modeAdd
 	m.focus = focusList
 	m.addCursor = 0
 	m.addMsg = ""
 	m.input.SetValue("")
 	m.input.Blur()
-	return m, nil
+	return m, scanCmd(cwd)
 }
 
 // exitAdd는 목록판으로 돌아가며 방금 등록분을 반영해 목록을 갱신한다.
@@ -76,33 +85,46 @@ func (m *model) toggleFocus() {
 	}
 }
 
-// handleInputKey는 경로 입력창의 키를 처리한다. Enter면 그 경로를 등록.
+// handleInputKey는 경로 입력창의 키를 처리한다. Enter면 입력 경로를 처리(등록 또는 재스캔).
 func (m model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if msg.String() == "enter" {
-		return m.registerPath(m.input.Value()), nil
+		return m.submitInput(m.input.Value())
 	}
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)
 	return m, cmd
 }
 
-// registerPath는 직접 입력한 경로를 검증·등록한다.
-func (m model) registerPath(p string) model {
+// submitInput은 입력 경로가 프로젝트면 바로 등록하고, 그냥 디렉토리면 그 아래로 좁혀 재스캔한다.
+// 홈처럼 넓은 곳에서 시작해도 입력창으로 범위를 좁힐 수 있게 한다.
+func (m model) submitInput(p string) (tea.Model, tea.Cmd) {
 	p = strings.TrimSpace(p)
 	if p == "" {
-		return m
+		return m, nil
 	}
 	abs, err := config.ValidatePath(p)
 	if err != nil {
 		m.addMsg = "오류: " + err.Error()
-		return m
+		return m, nil
 	}
-	if err := addPath(abs, filepath.Base(abs)); err != nil {
-		m.addMsg = "오류: " + err.Error()
-		return m
+	if scan.ProjectMarker(abs) != "" {
+		// 프로젝트 → 등록하고 목록으로.
+		if err := addPath(abs, filepath.Base(abs)); err != nil {
+			m.addMsg = "오류: " + err.Error()
+			return m, nil
+		}
+		markAlready(m.cands, abs)
+		return m.exitAdd(), nil
 	}
-	markAlready(m.cands, abs) // 후보에 있으면 등록됨으로
-	return m.exitAdd()        // 등록 완료 → 목록으로 복귀
+	// 프로젝트 아닌 디렉토리 → 그 아래로 좁혀 재스캔.
+	m.addRoot = abs
+	m.cands = nil
+	m.scanning = true
+	m.addMsg = ""
+	m.input.SetValue("")
+	m.focus = focusList
+	m.input.Blur()
+	return m, scanCmd(abs)
 }
 
 func (m model) handleCandKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

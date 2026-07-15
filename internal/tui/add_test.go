@@ -54,13 +54,30 @@ func key(s string) tea.KeyMsg {
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
 }
 
+// enterAddSync는 추가 화면에 진입하고 백그라운드 스캔(scanCmd)을 동기적으로 완료시킨다.
+func enterAddSync(t *testing.T, m model) model {
+	t.Helper()
+	nm, cmd := m.handleKey(key("a"))
+	m = nm.(model)
+	if cmd == nil {
+		t.Fatal("scan 커맨드가 없음")
+	}
+	nm2, _ := m.Update(cmd()) // scanCmd 실행 → candsMsg 반영
+	return nm2.(model)
+}
+
 // a로 추가 화면 진입 → 후보 두 개가 스캔되는지.
 func TestEnterAddScansCandidates(t *testing.T) {
 	m := newAddModel(t)
+	// 진입 직후에는 스캔 중이어야(비동기).
 	nm, _ := m.handleKey(key("a"))
-	am := nm.(model)
-	if am.mode != modeAdd {
-		t.Fatalf("mode=%v, modeAdd 기대", am.mode)
+	if am := nm.(model); am.mode != modeAdd || !am.scanning {
+		t.Fatalf("진입 직후 mode=%v scanning=%v, modeAdd+scanning 기대", am.mode, am.scanning)
+	}
+	// 스캔 완료 후 후보 두 개.
+	am := enterAddSync(t, m)
+	if am.scanning {
+		t.Fatal("스캔 완료 후에도 scanning=true")
 	}
 	if len(am.cands) != 2 {
 		t.Fatalf("후보 %d개, 2개 기대", len(am.cands))
@@ -70,11 +87,10 @@ func TestEnterAddScansCandidates(t *testing.T) {
 // 후보를 space로 선택하고 enter로 등록하면 config에 반영되는지.
 func TestSelectAndRegister(t *testing.T) {
 	m := newAddModel(t)
-	nm, _ := m.handleKey(key("a"))
-	m = nm.(model)
+	m = enterAddSync(t, m)
 
 	// 첫 후보 선택(space), 커서 내려 둘째도 선택.
-	nm, _ = m.handleAddKey(key(" "))
+	nm, _ := m.handleAddKey(key(" "))
 	m = nm.(model)
 	nm, _ = m.handleAddKey(key("j"))
 	m = nm.(model)
@@ -107,10 +123,9 @@ func TestSelectAndRegister(t *testing.T) {
 // 선택 없이 enter면 목록으로 나가지 않고 안내만 표시.
 func TestRegisterNoneStaysInAdd(t *testing.T) {
 	m := newAddModel(t)
-	nm, _ := m.handleKey(key("a"))
-	m = nm.(model)
+	m = enterAddSync(t, m)
 
-	nm, _ = m.handleAddKey(key("enter")) // 아무것도 선택 안 함
+	nm, _ := m.handleAddKey(key("enter")) // 아무것도 선택 안 함
 	m = nm.(model)
 	if m.mode != modeAdd {
 		t.Fatalf("선택 없이 enter인데 mode=%v, modeAdd 유지 기대", m.mode)
@@ -120,14 +135,59 @@ func TestRegisterNoneStaysInAdd(t *testing.T) {
 	}
 }
 
+// 입력창에 프로젝트 아닌 디렉토리를 넣으면 그 아래로 좁혀 재스캔한다.
+func TestSubmitInputRescansDir(t *testing.T) {
+	root := t.TempDir()
+	// root 아래에 프로젝트 하위 폴더를 둔다(root 자신은 마커 없음).
+	sub := filepath.Join(root, "nested", "proj-x")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sub, "CLAUDE.md"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m := newAddModel(t) // cwd는 다른 트리
+	m.mode = modeAdd
+
+	nm, cmd := m.submitInput(root)
+	m = nm.(model)
+	if !m.scanning || m.addRoot != root {
+		t.Fatalf("재스캔 진입 실패: scanning=%v root=%q", m.scanning, m.addRoot)
+	}
+	nm2, _ := m.Update(cmd()) // 스캔 완료
+	m = nm2.(model)
+	if len(m.cands) != 1 || m.cands[0].c.Name != "proj-x" {
+		t.Fatalf("재스캔 후보=%+v, proj-x 하나 기대", m.cands)
+	}
+}
+
+// 입력창에 프로젝트 경로를 넣으면 바로 등록하고 목록으로 복귀한다.
+func TestSubmitInputRegistersProject(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m := newAddModel(t)
+	m.mode = modeAdd
+
+	nm, _ := m.submitInput(root)
+	m = nm.(model)
+	if m.mode != modeList {
+		t.Fatalf("프로젝트 등록 후 mode=%v, modeList 기대", m.mode)
+	}
+	cfg, _ := config.Load()
+	if cfg.FindByPath(root) == nil {
+		t.Fatal("입력 경로가 등록되지 않음")
+	}
+}
+
 // 이미 등록된 후보는 space로 선택되지 않는지.
 func TestAlreadyRegisteredNotSelectable(t *testing.T) {
 	m := newAddModel(t)
-	nm, _ := m.handleKey(key("a"))
-	m = nm.(model)
+	m = enterAddSync(t, m)
 	m.cands[0].already = true
 
-	nm, _ = m.handleAddKey(key(" ")) // 커서는 0
+	nm, _ := m.handleAddKey(key(" ")) // 커서는 0
 	m = nm.(model)
 	if m.cands[0].selected {
 		t.Fatal("등록된 후보가 선택됨")

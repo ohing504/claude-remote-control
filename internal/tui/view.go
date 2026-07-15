@@ -98,9 +98,15 @@ func (m model) addView() string {
 	}
 	b.WriteString(inputPrefix + m.input.View() + "\n\n")
 
+	if m.scanning {
+		b.WriteString(helpStyle.Render("스캔 중… · "+m.addRoot) + "\n")
+		b.WriteString("  (넓은 폴더는 시간이 걸립니다 — 입력창에 경로를 넣어 범위를 좁힐 수 있어요)\n")
+		b.WriteString("\n" + helpStyle.Render("tab 포커스 전환 · esc 취소"))
+		return b.String()
+	}
 	b.WriteString(helpStyle.Render(fmt.Sprintf("후보 %d · %s", len(m.cands), m.addRoot)) + "\n")
 	if len(m.cands) == 0 {
-		b.WriteString("  (이 폴더 아래 후보 없음 — 위 입력창으로 경로를 직접 추가)\n")
+		b.WriteString("  (이 폴더 아래 후보 없음 — 위 입력창으로 경로를 직접 추가/스캔)\n")
 	}
 	// 입력창3 + 제목2 + 헤더1 + 메시지1 + 도움말2 = 약 9줄을 리스트 밖이 차지.
 	start, end := windowBounds(m.addCursor, len(m.cands), visibleCount(m.height, 9))

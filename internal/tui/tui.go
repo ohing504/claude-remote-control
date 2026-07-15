@@ -69,6 +69,7 @@ type model struct {
 	addCursor int
 	focus     addFocus
 	addMsg    string // 등록 결과/에러 안내
+	scanning  bool   // 후보 스캔이 백그라운드로 진행 중
 }
 
 type (
@@ -163,6 +164,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.rows, m.err = msg.rows, msg.err
 		if m.cursor >= len(m.rows) && len(m.rows) > 0 {
 			m.cursor = len(m.rows) - 1
+		}
+		return m, nil
+	case candsMsg:
+		m.cands = msg.cands
+		m.scanning = false
+		if m.addCursor >= len(m.cands) {
+			m.addCursor = 0
 		}
 		return m, nil
 	case logTickMsg:

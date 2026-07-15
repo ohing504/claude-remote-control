@@ -31,15 +31,17 @@ func Find(root string, maxDepth int) ([]Candidate, error) {
 			return nil
 		}
 		if path != root {
-			switch d.Name() {
-			case ".git", "node_modules":
+			name := d.Name()
+			// node_modules와 모든 숨김 디렉토리(.git·.cache·.Trash 등)는 진입하지 않는다.
+			// .claude 마커는 부모에서 Stat으로 감지하므로 그 안으로 들어갈 필요가 없다.
+			if name == "node_modules" || strings.HasPrefix(name, ".") {
 				return fs.SkipDir
 			}
 		}
 		if depthFrom(root, path) > maxDepth {
 			return fs.SkipDir
 		}
-		if marker := projectMarker(path); marker != "" {
+		if marker := ProjectMarker(path); marker != "" {
 			out = append(out, Candidate{Path: path, Name: filepath.Base(path), Marker: marker})
 			// 하위에서 프로젝트를 찾으면 그 서브트리는 더 안 본다 — 최상위 프로젝트만
 			// 후보로 남겨 서브패키지·third-parties의 중첩 CLAUDE.md를 거른다.
@@ -53,8 +55,8 @@ func Find(root string, maxDepth int) ([]Candidate, error) {
 	return out, err
 }
 
-// projectMarker는 디렉토리가 프로젝트임을 나타내는 표식을 반환한다(없으면 "").
-func projectMarker(dir string) string {
+// ProjectMarker는 디렉토리가 프로젝트임을 나타내는 표식을 반환한다(없으면 "").
+func ProjectMarker(dir string) string {
 	if fi, err := os.Stat(filepath.Join(dir, "CLAUDE.md")); err == nil && !fi.IsDir() {
 		return "CLAUDE.md"
 	}
