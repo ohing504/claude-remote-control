@@ -30,7 +30,7 @@ func Find(root string, maxDepth int) ([]Candidate, error) {
 			return nil // 권한 없는 하위 등은 조용히 건너뜀
 		}
 		// 심링크가 프로젝트 디렉토리를 가리키면 후보에 넣되, 그 안으로는 진입하지 않는다
-		// (WalkDir는 심링크를 따라가지 않고, 따라가면 순환 위험이 있다). 예: ~/Second Brain.
+		// (WalkDir는 심링크를 따라가지 않고, 따라가면 순환 위험이 있다). 예: ~/notes.
 		if d.Type()&fs.ModeSymlink != 0 {
 			if fi, e := os.Stat(path); e == nil && fi.IsDir() {
 				if marker := ProjectMarker(path); marker != "" {

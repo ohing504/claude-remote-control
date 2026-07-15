@@ -117,7 +117,7 @@ func TestFindDoesNotHideNested(t *testing.T) {
 	}
 }
 
-// 심링크가 프로젝트를 가리키면 후보에 포함한다(예: ~/Second Brain).
+// 심링크가 프로젝트를 가리키면 후보에 포함한다(예: ~/notes).
 func TestFindFollowsSymlinkToProject(t *testing.T) {
 	root := t.TempDir()
 	// 실제 프로젝트는 root 밖에 두고, root 안에 심링크만 놓는다.
