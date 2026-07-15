@@ -1,6 +1,6 @@
 # crc 아키텍처 문서
 
-`claude-remote-control`(도구명 `crc`)의 **설계 결정·기술 구조 SSOT**. 제품 정의(왜·무엇·범위)는 [`../README.md`](../README.md), 기능 명세·구현 상태는 [`SPEC.md`](SPEC.md)가 담당한다. 이 문서는 "어떻게 설계했나"만 다룬다.
+`claude-remote-control`(도구명 `crc`)의 **설계 결정·기술 구조 SSOT**. 제품 정의(왜·무엇·범위)는 [`../README.md`](../README.md), 기능 명세는 [`SPEC.md`](SPEC.md)가 담당한다. 이 문서는 "어떻게 설계했나"만 다룬다.
 
 - **프로젝트명**: `claude-remote-control` / **바이너리명**: `crc` (`rc`는 너무 광범위·흔함 → 폐기)
 

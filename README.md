@@ -2,7 +2,7 @@
 
 여러 프로젝트의 `claude remote-control` 서버를 한 화면에서 켜고·끄고·상태 보고·로그 보는 **Go TUI**. tmux 없이 바이너리 하나로 돈다.
 
-> **상태: 기능 완비(M0~M6).** 등록·생명주기·상태판 TUI·scan·로그·설치까지 동작. 기능 명세·구현 상태는 [`docs/SPEC.md`](docs/SPEC.md), 설계 결정과 근거는 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)가 SSOT.
+> 등록·생명주기·상태판 TUI·scan·로그·설치까지 동작한다. 기능 명세는 [`docs/SPEC.md`](docs/SPEC.md), 설계 결정과 근거는 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)가 SSOT.
 
 ## 왜 만드나
 
@@ -33,7 +33,7 @@ $ crc
 - **한다** — 프로젝트마다 하나씩 띄우는 remote-control 서버(보통 3~4개)의 등록·토글·상태·로그.
 - **안 한다(비목표)** — 로컬 TTY attach(조작은 폰·웹에서), 세션 내부 조작, tmux 대체 일반화, 폰/데스크탑 환경 라벨 관리(claude가 basename+브랜치로 고정 — crc 밖 영역).
 
-기능별 상세 명세와 구현 상태는 [`docs/SPEC.md`](docs/SPEC.md)가 SSOT.
+기능별 상세 명세는 [`docs/SPEC.md`](docs/SPEC.md)가 SSOT.
 
 ## 왜 tmux가 아니라 Go 단일 바이너리인가
 
