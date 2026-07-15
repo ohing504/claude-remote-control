@@ -97,14 +97,20 @@ func cmdAdd(args []string) error {
 	if err != nil {
 		return err
 	}
+	explicit := len(args) >= 2
 	name := filepath.Base(abs)
-	if len(args) >= 2 {
+	if explicit {
 		name = args[1]
 	}
 
 	cfg, err := config.Load()
 	if err != nil {
 		return err
+	}
+	// 이름을 명시하지 않았을 때만 basename 충돌을 부모명으로 자동 해소한다.
+	// 명시했으면 사용자 의도를 존중해 그대로 두고, 충돌 시 Add가 에러를 낸다.
+	if !explicit {
+		name = cfg.UniqueName(abs, name)
 	}
 	if err := cfg.Add(config.Workspace{Name: name, Path: abs}); err != nil {
 		return err

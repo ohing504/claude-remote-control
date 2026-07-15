@@ -153,11 +153,13 @@ func (m model) registerSelected() model {
 }
 
 // addPath는 config에 워크스페이스 하나를 더해 저장한다.
-func addPath(abs, name string) error {
+// basename이 겹치면 부모명을 붙여 자동으로 유니크하게 만든다.
+func addPath(abs, base string) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return err
 	}
+	name := cfg.UniqueName(abs, base)
 	if err := cfg.Add(config.Workspace{Name: name, Path: abs}); err != nil {
 		return err
 	}

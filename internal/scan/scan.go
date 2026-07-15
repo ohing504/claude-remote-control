@@ -41,6 +41,12 @@ func Find(root string, maxDepth int) ([]Candidate, error) {
 		}
 		if marker := projectMarker(path); marker != "" {
 			out = append(out, Candidate{Path: path, Name: filepath.Base(path), Marker: marker})
+			// 하위에서 프로젝트를 찾으면 그 서브트리는 더 안 본다 — 최상위 프로젝트만
+			// 후보로 남겨 서브패키지·third-parties의 중첩 CLAUDE.md를 거른다.
+			// root 자신이 마커를 가져도(예: ~/workspace/.claude) 하위 탐색은 계속한다.
+			if path != root {
+				return fs.SkipDir
+			}
 		}
 		return nil
 	})

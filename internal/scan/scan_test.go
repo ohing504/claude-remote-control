@@ -90,6 +90,59 @@ func TestFindDepthLimit(t *testing.T) {
 	}
 }
 
+// 프로젝트 안에 중첩된 프로젝트(서브패키지·third-parties)는 최상위만 후보.
+func TestFindSkipsNestedProjects(t *testing.T) {
+	root := t.TempDir()
+	// top이 프로젝트이고 그 아래 apps/sub, third-parties/lib도 마커를 가진다.
+	mk := func(rel string) {
+		dir := filepath.Join(root, rel)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mk("top")
+	mk("top/apps/sub")
+	mk("top/third-parties/lib")
+
+	cands, err := Find(root, DefaultMaxDepth)
+	if err != nil {
+		t.Fatalf("Find: %v", err)
+	}
+	if got := names(cands); !slices.Equal(got, []string{"top"}) {
+		t.Fatalf("후보=%v, [top]만 기대(중첩은 스킵)", got)
+	}
+}
+
+// root 자신이 마커를 가져도(예: ~/workspace/.claude) 하위 프로젝트 탐색은 계속돼야.
+func TestFindRootMarkerStillScansChildren(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	child := filepath.Join(root, "proj-a")
+	if err := os.MkdirAll(child, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(child, "CLAUDE.md"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cands, err := Find(root, DefaultMaxDepth)
+	if err != nil {
+		t.Fatalf("Find: %v", err)
+	}
+	// root와 proj-a 둘 다 후보(root 마커가 하위를 막지 않음).
+	if len(cands) != 2 {
+		t.Fatalf("후보 %d개, 2개 기대(root+proj-a): %v", len(cands), names(cands))
+	}
+	if !slices.Contains(names(cands), "proj-a") {
+		t.Fatalf("하위 proj-a가 후보에 없음: %v", names(cands))
+	}
+}
+
 func TestFindRootItself(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte("x"), 0o600); err != nil {

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 )
 
 // Workspace는 등록된 remote-control 서버 하나(= 디렉토리 하나)를 가리킨다.
@@ -124,6 +126,34 @@ func (c *Config) Add(ws Workspace) error {
 	}
 	c.Workspaces = append(c.Workspaces, ws)
 	return nil
+}
+
+// UniqueName은 base가 이미 등록돼 있으면 부모 폴더명을 앞에 붙여 유니크한 이름을 만든다.
+// 이름은 pid·log 파일명으로 쓰이므로 경로 구분자는 '-'로 잇는다.
+// 예: budget-master가 이미 있으면 references-budget-master.
+func (c *Config) UniqueName(path, base string) string {
+	if c.Find(base) == nil {
+		return base
+	}
+	parts := strings.Split(filepath.Clean(path), string(filepath.Separator))
+	name := base
+	// path의 마지막(=base) 바로 위 부모부터 하나씩 앞에 붙인다.
+	for i := len(parts) - 2; i >= 0; i-- {
+		if parts[i] == "" {
+			continue
+		}
+		name = parts[i] + "-" + name
+		if c.Find(name) == nil {
+			return name
+		}
+	}
+	// 조상까지 다 붙여도 겹치면 숫자 접미사.
+	for n := 2; ; n++ {
+		cand := base + "-" + strconv.Itoa(n)
+		if c.Find(cand) == nil {
+			return cand
+		}
+	}
 }
 
 // Remove는 이름으로 워크스페이스를 제거한다. 없으면 에러.

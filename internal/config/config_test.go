@@ -159,3 +159,26 @@ func TestSaveAtomicNoTempLeftover(t *testing.T) {
 		}
 	}
 }
+
+func TestUniqueName(t *testing.T) {
+	cfg := &Config{Workspaces: []Workspace{
+		{Name: "budget-master", Path: "/a/outsourcing/budget-master"},
+	}}
+
+	// 안 겹치면 base 그대로.
+	if got := cfg.UniqueName("/a/proj-x", "proj-x"); got != "proj-x" {
+		t.Fatalf("비충돌: %q, proj-x 기대", got)
+	}
+	// 겹치면 부모명을 붙여 유니크.
+	if got := cfg.UniqueName("/a/references/budget-master", "budget-master"); got != "references-budget-master" {
+		t.Fatalf("충돌 해소: %q, references-budget-master 기대", got)
+	}
+
+	// 부모까지 겹치면 조상, 끝내 숫자 접미사로.
+	cfg.Workspaces = append(cfg.Workspaces,
+		Workspace{Name: "references-budget-master", Path: "/a/references/budget-master"})
+	got := cfg.UniqueName("/z/budget-master", "budget-master")
+	if got == "budget-master" || cfg.Find(got) != nil {
+		t.Fatalf("유니크하지 않은 이름 반환: %q", got)
+	}
+}
