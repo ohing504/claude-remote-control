@@ -101,9 +101,10 @@ bubbletea 상태판.
 
 | 규칙 | 동작 | 상태 |
 |---|---|---|
-| 상태색 | running=초록 / stopped=회색 / dead=빨강 | ⬜ M4 |
-| 키맵 | ↑↓/jk 이동, ↵ 토글, l 로그, f fg, a 전체시작/x 전체정지, s scan, d 삭제, r 새로고침, q 종료 | ⬜ M4 |
-| 갱신 | tick으로 상태 주기 갱신 | ⬜ M4 |
+| 상태색 | running=초록 / stopped=회색 / dead=빨강 (마커 ●/○/✗) | ✅ |
+| 키맵(핵심) | ↑↓/jk 이동, ↵ 토글, a 전체시작/x 전체정지, r 새로고침, q 종료 | ✅ |
+| 키맵(잔여) | l 로그·f fg(TUI 안 뷰 통합), s scan(M5), d 삭제 | ⬜ |
+| 갱신 | tick으로 상태 주기 갱신(2s) | ✅ |
 
 ## 진행 · 우선순위
 
@@ -111,6 +112,6 @@ bubbletea 상태판.
 
 - **완료**: M0(스캐폴드·config·ls·add), M0.5(품질 인프라: golangci-lint·lefthook·commit-msg 훅·테스트), M1(등록 CRUD), M2(생명주기 `up`/`down`/`status`·env 절대 규칙·상태 열·CLI E2E testscript), M3(로그·포그라운드: `log` follow·`fg`, dead 원인 로그 노출 검증). ※ M2 핵심 성공기준의 폰 도착 수동 검증만 남음(위 성공기준 참조).
 
-1. **M4 · TUI** — 상태판·토글·로그뷰. 검증: 상태색이 실제 프로세스와 일치, ↵ 토글 동작.
+1. **M4.5 · TUI 로그·fg 통합** — TUI 안에서 `l`(로그뷰포트)·`f`(fg, `tea.ExecProcess`로 일시정지)·`d`(삭제). 검증: TUI에서 로그가 보이고 fg 실행 후 복귀.
 2. **M5 · CLAUDE.md 스캔 등록** — `scan`. 검증: CLAUDE.md 있는 디렉토리만, `.git`·`node_modules` 스킵.
-3. **M6 · 다듬기·설치** — 상태색·업타임·**dead 정리(좀비 reap 지연 오판 해소)**, `go build`로 `~/.local/bin/crc` 설치. 검증: 설치 바이너리로 전체 흐름 재현.
+3. **M6 · 다듬기·설치** — 업타임 표시·**dead 정리(좀비 reap 지연 오판 해소)**, `go build`로 `~/.local/bin/crc` 설치. 검증: 설치 바이너리로 전체 흐름 재현.

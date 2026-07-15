@@ -11,6 +11,7 @@ import (
 	"crc/internal/config"
 	"crc/internal/server"
 	"crc/internal/state"
+	"crc/internal/tui"
 )
 
 func main() {
@@ -22,8 +23,7 @@ func main() {
 
 func run(args []string) error {
 	if len(args) == 0 {
-		// TUI는 M4. 그전까지는 사용법 안내.
-		return cmdUsage()
+		return tui.Run()
 	}
 	switch args[0] {
 	case "ls":
