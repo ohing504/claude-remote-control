@@ -104,8 +104,9 @@ bubbletea 상태판.
 | 규칙 | 동작 | 상태 |
 |---|---|---|
 | 상태색 | running=초록 / stopped=회색 / dead=빨강 (마커 ●/○/✗) | ✅ |
-| 키맵(핵심) | ↑↓/jk 이동, ↵ 토글, a 전체시작/x 전체정지, r 새로고침, q 종료 | ✅ |
-| 키맵(잔여) | l 로그·f fg(TUI 안 뷰 통합), s scan(M5), d 삭제 | ⬜ |
+| 키맵(핵심) | ↑↓/jk 이동, ↵ 토글, A 전체시작/x 전체정지, r 새로고침, q 종료 | ✅ |
+| 키맵(추가) | a → 추가 화면: 경로 입력창 + scan 후보 `space` 멀티선택 → `enter` 일괄 등록, tab 포커스 전환, esc 취소 | ✅ |
+| 키맵(잔여) | l 로그·f fg(TUI 안 뷰 통합), d 삭제 | ⬜ |
 | 갱신 | tick으로 상태 주기 갱신(2s) | ✅ |
 
 ## 진행 · 우선순위
@@ -114,6 +115,5 @@ bubbletea 상태판.
 
 - **완료**: M0(스캐폴드·config·ls·add), M0.5(품질 인프라: golangci-lint·lefthook·commit-msg 훅·테스트), M1(등록 CRUD), M2(생명주기 `up`/`down`/`status`·env 절대 규칙·상태 열·CLI E2E testscript), M3(로그·포그라운드: `log` follow·`fg`, dead 원인 로그 노출 검증). ※ M2 핵심 성공기준의 폰 도착 수동 검증만 남음(위 성공기준 참조).
 
-1. **M5.5 · TUI 추가 화면** — 목록에서 `a` → 추가 화면(경로 입력창 + scan 후보 `space` 멀티선택 → `enter` 일괄 등록). 기존 `a` 전체시작은 `A`로 이동. 검증: TUI에서 후보를 골라 여러 개 등록.
-2. **M4.5 · TUI 로그·fg 통합** — TUI 안에서 `l`(로그뷰포트)·`f`(fg, `tea.ExecProcess`로 일시정지)·`d`(삭제). 검증: TUI에서 로그가 보이고 fg 실행 후 복귀.
+1. **M4.5 · TUI 로그·fg 통합** — TUI 안에서 `l`(로그뷰포트)·`f`(fg, `tea.ExecProcess`로 일시정지)·`d`(삭제). 검증: TUI에서 로그가 보이고 fg 실행 후 복귀.
 3. **M6 · 다듬기·설치** — 업타임 표시·**dead 정리(좀비 reap 지연 오판 해소)**, `go build`로 `~/.local/bin/crc` 설치. 검증: 설치 바이너리로 전체 흐름 재현.

@@ -4,9 +4,11 @@ package tui
 import (
 	"time"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"crc/internal/config"
+	"crc/internal/scan"
 	"crc/internal/server"
 	"crc/internal/state"
 )
@@ -14,9 +16,32 @@ import (
 // refreshInterval은 상태를 다시 판정하는 주기다. 사람이 보는 상태판이라 촘촘할 필요 없다.
 const refreshInterval = 2 * time.Second
 
+// mode는 화면 상태다: 목록판 ↔ 추가 화면.
+type mode int
+
+const (
+	modeList mode = iota
+	modeAdd
+)
+
+// addFocus는 추가 화면에서 키 입력을 받는 영역이다(경로 입력창 ↔ 후보 목록).
+type addFocus int
+
+const (
+	focusInput addFocus = iota
+	focusList
+)
+
 type row struct {
 	ws config.Workspace
 	st server.State
+}
+
+// addCand는 추가 화면의 scan 후보 한 줄이다.
+type addCand struct {
+	c        scan.Candidate
+	selected bool
+	already  bool // 이미 등록됨 — 선택 불가
 }
 
 type model struct {
@@ -24,6 +49,15 @@ type model struct {
 	cursor int
 	dir    string // state 디렉토리(pid·log)
 	err    error
+
+	// 추가 화면 상태.
+	mode      mode
+	input     textinput.Model
+	addRoot   string
+	cands     []addCand
+	addCursor int
+	focus     addFocus
+	addMsg    string // 등록 결과/에러 안내
 }
 
 type (
@@ -40,7 +74,10 @@ func Run() error {
 	if err != nil {
 		return err
 	}
-	m := model{dir: dir}
+	ti := textinput.New()
+	ti.Placeholder = "폴더 경로 입력 후 Enter로 등록"
+	ti.Prompt = "경로: "
+	m := model{dir: dir, input: ti}
 	m.rows, m.err = loadRows(dir)
 	_, err = tea.NewProgram(m).Run()
 	return err
@@ -118,6 +155,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case tea.KeyMsg:
+		if m.mode == modeAdd {
+			return m.handleAddKey(msg)
+		}
 		return m.handleKey(msg)
 	}
 	return m, nil
@@ -140,6 +180,8 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, toggleCmd(m.dir, m.rows[m.cursor])
 		}
 	case "a":
+		return m.enterAdd()
+	case "A":
 		return m, allCmd(m.dir, m.rows, true)
 	case "x":
 		return m, allCmd(m.dir, m.rows, false)

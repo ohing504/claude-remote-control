@@ -29,6 +29,13 @@ var (
 )
 
 func (m model) View() string {
+	if m.mode == modeAdd {
+		return m.addView()
+	}
+	return m.listView()
+}
+
+func (m model) listView() string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("crc — workspaces") + "\n\n")
 
@@ -48,11 +55,61 @@ func (m model) View() string {
 	}
 
 	b.WriteString("\n" + helpStyle.Render(
-		"↑↓/jk 이동 · ↵ 토글 · a 전체시작 · x 전체정지 · r 새로고침 · q 종료"))
+		"↑↓/jk 이동 · ↵ 토글 · a 추가 · A 전체시작 · x 전체정지 · r 새로고침 · q 종료"))
 	if m.err != nil {
 		b.WriteString("\n" + errStyle.Render("에러: "+m.err.Error()))
 	}
 	return b.String()
+}
+
+func (m model) addView() string {
+	var b strings.Builder
+	b.WriteString(titleStyle.Render("crc — 추가") + "\n\n")
+
+	// 경로 입력창(포커스면 마커 표시).
+	inputPrefix := "  "
+	if m.focus == focusInput {
+		inputPrefix = "▸ "
+	}
+	b.WriteString(inputPrefix + m.input.View() + "\n\n")
+
+	b.WriteString(helpStyle.Render("후보 · "+m.addRoot) + "\n")
+	if len(m.cands) == 0 {
+		b.WriteString("  (이 폴더 아래 후보 없음 — 위 입력창으로 경로를 직접 추가)\n")
+	}
+	for i, c := range m.cands {
+		b.WriteString(renderCand(c, m.focus == focusList && i == m.addCursor) + "\n")
+	}
+
+	if m.addMsg != "" {
+		b.WriteString("\n" + m.addMsg)
+	}
+	b.WriteString("\n\n" + helpStyle.Render(
+		"tab 포커스 전환 · space 선택 · ↵ 등록 · esc 취소"))
+	return b.String()
+}
+
+func renderCand(c addCand, cursor bool) string {
+	prefix := "  "
+	if cursor {
+		prefix = "▸ "
+	}
+	box := "[ ]"
+	switch {
+	case c.already:
+		box = "[–]"
+	case c.selected:
+		box = "[x]"
+	}
+	line := fmt.Sprintf("%s%s %-20s %s", prefix, box, c.c.Name, c.c.Path)
+	switch {
+	case c.already:
+		return helpStyle.Render(line + "  (등록됨)")
+	case cursor:
+		return cursorRow.Render(line)
+	default:
+		return line
+	}
 }
 
 func renderRow(r row) string {
