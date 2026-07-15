@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"crc/internal/config"
+	"crc/internal/scan"
 	"crc/internal/server"
 	"crc/internal/state"
 	"crc/internal/tui"
@@ -42,6 +43,8 @@ func run(args []string) error {
 		return cmdLog(args[1:])
 	case "fg":
 		return cmdFg(args[1:])
+	case "scan":
+		return cmdScan(args[1:])
 	case "-h", "--help", "help":
 		return cmdUsage()
 	default:
@@ -61,6 +64,7 @@ func cmdUsage() error {
   crc status               전체 상태 판정
   crc log  <name>          로그 실시간 추적 (tail -f, Ctrl-C 종료)
   crc fg   <name>          포그라운드로 실행 (로그를 눈앞에서, Ctrl-C 종료)
+  crc scan [root]          CLAUDE.md/.claude 있는 등록 후보 나열 (기본 현재 폴더)
 `)
 	return nil
 }
@@ -261,6 +265,37 @@ func cmdFg(args []string) error {
 	}
 	s := server.Server{Name: ws.Name, Path: ws.Path}
 	return s.Foreground(dir)
+}
+
+func cmdScan(args []string) error {
+	root := "."
+	if len(args) >= 1 {
+		root = args[0]
+	}
+	abs, err := filepath.Abs(root)
+	if err != nil {
+		return err
+	}
+	cands, err := scan.Find(abs, scan.DefaultMaxDepth)
+	if err != nil {
+		return err
+	}
+	if len(cands) == 0 {
+		fmt.Printf("(%s 아래에 CLAUDE.md/.claude 있는 폴더 없음)\n", abs)
+		return nil
+	}
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	for _, c := range cands {
+		suffix := ""
+		if cfg.FindByPath(c.Path) != nil {
+			suffix = "  (등록됨)"
+		}
+		fmt.Printf("%-40s [%s]%s\n", c.Path, c.Marker, suffix)
+	}
+	return nil
 }
 
 func cmdStatus() error {

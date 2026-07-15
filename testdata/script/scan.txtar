@@ -1,0 +1,26 @@
+# scan 후보 발견 + 등록 표시 E2E.
+
+# 트리 구성: 마커 있는 폴더 둘, 마커 없는 폴더, node_modules 안(스킵 대상)
+mkdir tree/proj-a
+mkdir tree/proj-b/.claude
+mkdir tree/plain
+mkdir tree/node_modules/pkg
+exec touch tree/proj-a/CLAUDE.md
+exec touch tree/node_modules/pkg/CLAUDE.md
+
+# 후보로 proj-a(CLAUDE.md)·proj-b(.claude)만, plain·node_modules는 제외
+exec crc scan tree
+stdout 'proj-a.*CLAUDE\.md'
+stdout 'proj-b.*\.claude'
+! stdout 'plain'
+! stdout 'node_modules'
+
+# proj-a를 등록하면 다음 scan에서 (등록됨) 표시
+exec crc add tree/proj-a proj-a
+stdout '등록: proj-a'
+exec crc scan tree
+stdout 'proj-a.*등록됨'
+
+# 후보 없는 위치는 안내
+exec crc scan tree/plain
+stdout '없음'

@@ -89,12 +89,14 @@
 | 이미 실행 중 | detached로 떠 있으면 중복 기동 거부 | ✅ |
 
 ### `crc scan [root]`
-`root`(기본 `~/workspace`) 아래 CLAUDE.md/.claude 있는 디렉토리를 후보로 골라 등록.
+`root`(기본 **현재 폴더**) 아래 CLAUDE.md/.claude 있는 디렉토리를 **후보로 나열**(자동 등록 아님 — 개인 경로 하드코딩 회피). 실제 등록은 `add` 또는 TUI 추가 화면.
 
 | 규칙 | 동작 | 상태 |
 |---|---|---|
-| 수집 | `WalkDir`로 CLAUDE.md/.claude 보유 디렉토리만 | ⬜ M5 |
-| 스킵 | `.git`·`node_modules` 제외, 깊이 상한 | ⬜ M5 |
+| 수집 | `WalkDir`로 CLAUDE.md/.claude 보유 디렉토리만 | ✅ |
+| 스킵 | `.git`·`node_modules` 제외, 깊이 상한(기본 4) | ✅ |
+| 등록 표시 | 이미 등록된 후보는 `(등록됨)` 표기 | ✅ |
+| 후보 없음 | 안내 문구 출력 | ✅ |
 
 ### `crc` (TUI)
 bubbletea 상태판.
@@ -112,6 +114,6 @@ bubbletea 상태판.
 
 - **완료**: M0(스캐폴드·config·ls·add), M0.5(품질 인프라: golangci-lint·lefthook·commit-msg 훅·테스트), M1(등록 CRUD), M2(생명주기 `up`/`down`/`status`·env 절대 규칙·상태 열·CLI E2E testscript), M3(로그·포그라운드: `log` follow·`fg`, dead 원인 로그 노출 검증). ※ M2 핵심 성공기준의 폰 도착 수동 검증만 남음(위 성공기준 참조).
 
-1. **M4.5 · TUI 로그·fg 통합** — TUI 안에서 `l`(로그뷰포트)·`f`(fg, `tea.ExecProcess`로 일시정지)·`d`(삭제). 검증: TUI에서 로그가 보이고 fg 실행 후 복귀.
-2. **M5 · CLAUDE.md 스캔 등록** — `scan`. 검증: CLAUDE.md 있는 디렉토리만, `.git`·`node_modules` 스킵.
+1. **M5.5 · TUI 추가 화면** — 목록에서 `a` → 추가 화면(경로 입력창 + scan 후보 `space` 멀티선택 → `enter` 일괄 등록). 기존 `a` 전체시작은 `A`로 이동. 검증: TUI에서 후보를 골라 여러 개 등록.
+2. **M4.5 · TUI 로그·fg 통합** — TUI 안에서 `l`(로그뷰포트)·`f`(fg, `tea.ExecProcess`로 일시정지)·`d`(삭제). 검증: TUI에서 로그가 보이고 fg 실행 후 복귀.
 3. **M6 · 다듬기·설치** — 업타임 표시·**dead 정리(좀비 reap 지연 오판 해소)**, `go build`로 `~/.local/bin/crc` 설치. 검증: 설치 바이너리로 전체 흐름 재현.
