@@ -43,8 +43,9 @@
 | 규칙 | 동작 | 상태 |
 |---|---|---|
 | 빈 목록 | `(등록된 워크스페이스 없음)` | ✅ |
-| 목록 | `<name>  <status>  <path>` 한 줄씩 | ✅ |
+| 목록 | `<name>  <status>  <업타임>  <path>` 한 줄씩 | ✅ |
 | 상태 열 | running/stopped/dead 표기 | ✅ |
+| 업타임 | running이면 pid mtime 기준 경과 시간(`↑ 12m`) | ✅ |
 
 ### `crc up [name...]`
 서버 시작. 인자 없으면 전체.
@@ -69,7 +70,7 @@
 
 | 규칙 | 동작 | 상태 |
 |---|---|---|
-| 판정 | `kill(pid,0)` → running/stopped/dead | ✅ |
+| 판정 | `kill(pid,0)` → running/stopped/dead. **좀비는 dead**(darwin `sysctl`로 감지 — `kill(0)`은 좀비도 통과하므로) | ✅ |
 
 ### `crc log <name>`
 로그 tail -f.
@@ -113,8 +114,7 @@ bubbletea 상태판.
 
 ## 진행 · 우선순위
 
-완료된 항목은 위 표에서 ✅로 바꾸고 여기서 줄을 삭제한다. 아래는 **미완료 작업의 구현 순서**.
+완료된 항목은 위 표에서 ✅로 바꾸고 여기서 줄을 삭제한다.
 
-- **완료**: M0(스캐폴드·config·ls·add), M0.5(품질 인프라: golangci-lint·lefthook·commit-msg 훅·테스트), M1(등록 CRUD), M2(생명주기 `up`/`down`/`status`·env 절대 규칙·상태 열·CLI E2E testscript), M3(로그·포그라운드: `log` follow·`fg`), M4(bubbletea 상태판·토글·전체·tick·스크롤), M5(scan 후보 발견·중첩 제외·이름 유니크), M5.5(TUI 추가 화면: 경로 입력 + 후보 멀티선택), M4.5(TUI 조작: `l` viewport 로그·`f` fg·`d` 삭제). ※ M2 핵심 성공기준의 폰 도착 수동 검증만 남음(위 성공기준 참조).
-
-1. **M6 · 다듬기·설치** — 업타임 표시·**dead 정리(좀비 reap 지연 오판 해소)**, `go build`로 `~/.local/bin/crc` 설치. 검증: 설치 바이너리로 전체 흐름 재현.
+- **완료(전 마일스톤)**: M0(스캐폴드·config·ls·add), M0.5(품질 인프라: golangci-lint·lefthook·commit-msg 훅·테스트), M1(등록 CRUD), M2(생명주기 `up`/`down`/`status`·env 절대 규칙·CLI E2E testscript), M3(로그·포그라운드: `log` follow·`fg`), M4(bubbletea 상태판·토글·전체·tick·스크롤), M5(scan 후보 발견·중첩 제외·이름 유니크), M5.5(TUI 추가 화면), M4.5(TUI 조작: `l` viewport 로그·`f` fg·`d` 삭제), M6(업타임 표시·좀비→dead 판정·`~/.local/bin` 설치).
+- **남은 수동 검증**: M2 핵심 성공기준의 폰 `SendUserFile` 도착(위 성공기준 참조 — 이미 1회 실기기 확인). 신규 조작(TUI 토글/fg)으로 띄운 서버에서도 폰 도착 재확인 권장.

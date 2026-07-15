@@ -83,8 +83,15 @@ func cmdLs() error {
 		return err
 	}
 	for _, ws := range cfg.Workspaces {
-		st := server.Status(state.PidPath(dir, ws.Name))
-		fmt.Printf("%-20s %-8s %s\n", ws.Name, st, ws.Path)
+		pidPath := state.PidPath(dir, ws.Name)
+		st := server.Status(pidPath)
+		up := ""
+		if st == server.Running {
+			if d, ok := server.Uptime(pidPath); ok {
+				up = "↑ " + server.HumanDuration(d)
+			}
+		}
+		fmt.Printf("%-20s %-8s %-8s %s\n", ws.Name, st, up, ws.Path)
 	}
 	return nil
 }

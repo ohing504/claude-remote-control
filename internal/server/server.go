@@ -58,6 +58,30 @@ func buildEnv(parent []string) []string {
 	return append(out, envRemoteType+"=1")
 }
 
+// Uptime은 pid 파일의 생성 시각(= 서버 시작 시각)으로부터 경과 시간을 반환한다.
+// pid 파일이 없으면(안 떠 있으면) ok=false. Start가 pid를 한 번만 쓰므로 mtime이 시작 시각이다.
+func Uptime(pidPath string) (time.Duration, bool) {
+	fi, err := os.Stat(pidPath)
+	if err != nil {
+		return 0, false
+	}
+	return time.Since(fi.ModTime()), true
+}
+
+// HumanDuration은 경과 시간을 짧게 포맷한다: 45s / 12m / 1h3m / 2d4h.
+func HumanDuration(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		return strconv.Itoa(int(d.Seconds())) + "s"
+	case d < time.Hour:
+		return strconv.Itoa(int(d.Minutes())) + "m"
+	case d < 24*time.Hour:
+		return strconv.Itoa(int(d.Hours())) + "h" + strconv.Itoa(int(d.Minutes())%60) + "m"
+	default:
+		return strconv.Itoa(int(d.Hours())/24) + "d" + strconv.Itoa(int(d.Hours())%24) + "h"
+	}
+}
+
 // Status는 pid 파일을 읽어 프로세스 생존을 판정한다.
 func Status(pidPath string) State {
 	pid, err := readPid(pidPath)
@@ -89,7 +113,11 @@ func processAlive(pid int) bool {
 	if err != nil {
 		return false
 	}
-	return proc.Signal(syscall.Signal(0)) == nil
+	if proc.Signal(syscall.Signal(0)) != nil {
+		return false
+	}
+	// signal 0은 좀비(종료했으나 미reap)도 통과한다 — 좀비는 죽은 것으로 본다.
+	return !isZombie(pid)
 }
 
 // Stop은 서버에 SIGTERM을 보내고, 잔존 시 SIGKILL로 종료한 뒤 pid 파일을 지운다.

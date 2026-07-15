@@ -2,7 +2,7 @@
 
 여러 프로젝트의 `claude remote-control` 서버를 한 화면에서 켜고·끄고·상태 보고·로그 보는 **Go TUI**. tmux 없이 바이너리 하나로 돈다.
 
-> **상태: 초기 구현 중.** 기능 명세·구현 상태는 [`docs/SPEC.md`](docs/SPEC.md), 설계 결정과 근거는 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)가 SSOT.
+> **상태: 기능 완비(M0~M6).** 등록·생명주기·상태판 TUI·scan·로그·설치까지 동작. 기능 명세·구현 상태는 [`docs/SPEC.md`](docs/SPEC.md), 설계 결정과 근거는 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)가 SSOT.
 
 ## 왜 만드나
 
@@ -39,9 +39,36 @@ $ crc
 
 remote-control 서버는 조작을 폰·웹에서 받는 **백그라운드 데몬**이다. 로컬 터미널로 attach할 일이 없다. 그래서 tmux의 핵심 가치인 양방향 attach가 이 용도에선 무의미하다. 남는 건 백그라운드 유지·상태·로그뿐이고 셋 다 Go 표준 라이브러리로 된다 → tmux 같은 외부 런타임 없이 **바이너리 하나 복사로 배포.** 이건 tmux를 뺀 것이지 의존성을 금하는 게 아니다 — 값어치 있는 Go 패키지는 쓴다(TUI는 bubbletea/lipgloss). (이 판단의 전체 과정은 docs/ARCHITECTURE.md.)
 
-## 설치·사용
+## 설치
 
-구현 후 작성.
+Go 1.26+ 필요. `~/.local/bin`에 바이너리 하나를 설치한다:
+
+```
+make install         # → ~/.local/bin/crc  (PREFIX=... 로 위치 변경 가능)
+```
+
+`~/.local/bin`이 `PATH`에 있으면 바로 `crc`로 실행된다. 없으면 셸 설정에 추가:
+
+```
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+## 사용
+
+```
+crc                      상태판 TUI (아래 키맵)
+crc ls                   등록 목록 + 상태·업타임
+crc add <path> [name]    워크스페이스 등록 (name 기본 basename, 충돌 시 자동 유니크)
+crc rm <name>            등록 삭제 (실행 중이면 정지 후)
+crc up   [name...]       서버 시작 (없으면 전체)
+crc down [name...]       서버 정지 (없으면 전체)
+crc status               상태 판정
+crc log  <name>          로그 tail -f
+crc fg   <name>          포그라운드 실행
+crc scan [root]          등록 후보 나열 (기본 현재 폴더)
+```
+
+**TUI 키맵** — `↑↓/jk` 이동 · `↵` 토글 · `l` 로그 · `a` 추가 · `d` 삭제 · `f` fg · `A` 전체시작 · `x` 전체정지 · `r` 새로고침 · `q` 종료
 
 ## 라이선스
 

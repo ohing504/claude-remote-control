@@ -121,3 +121,61 @@ func TestStopIdempotentishOnFastExit(t *testing.T) {
 		t.Fatalf("Stop(이미 종료): %v", err)
 	}
 }
+
+func TestHumanDuration(t *testing.T) {
+	cases := []struct {
+		d    time.Duration
+		want string
+	}{
+		{30 * time.Second, "30s"},
+		{5 * time.Minute, "5m"},
+		{90 * time.Minute, "1h30m"},
+		{50 * time.Hour, "2d2h"},
+	}
+	for _, c := range cases {
+		if got := HumanDuration(c.d); got != c.want {
+			t.Errorf("HumanDuration(%v)=%q, %q 기대", c.d, got, c.want)
+		}
+	}
+}
+
+// 살아있는 프로세스로 Uptime이 양수를 반환하는지.
+func TestUptime(t *testing.T) {
+	dir := t.TempDir()
+	pidPath := state.PidPath(dir, "u")
+	cmd := exec.Command("sleep", "30")
+	if err := startDetached(cmd, pidPath, state.LogPath(dir, "u")); err != nil {
+		t.Fatalf("startDetached: %v", err)
+	}
+	t.Cleanup(func() { _ = Stop(pidPath) })
+
+	d, ok := Uptime(pidPath)
+	if !ok || d < 0 {
+		t.Fatalf("Uptime=(%v,%v), 양수 기대", d, ok)
+	}
+	// 없는 pid 파일은 ok=false.
+	if _, ok := Uptime(state.PidPath(dir, "nope")); ok {
+		t.Fatal("없는 pid인데 ok=true")
+	}
+}
+
+// 즉시 종료해 좀비가 된 프로세스를 Dead로 판정하는지(darwin: sysctl, 그 외: 종료 감지).
+func TestZombieDetectedAsDead(t *testing.T) {
+	dir := t.TempDir()
+	pidPath := state.PidPath(dir, "z")
+	cmd := exec.Command("true") // 즉시 종료
+	if err := startDetached(cmd, pidPath, state.LogPath(dir, "z")); err != nil {
+		t.Fatalf("startDetached: %v", err)
+	}
+	t.Cleanup(func() { _ = Stop(pidPath) })
+
+	// startDetached는 wait하지 않으므로 자식은 좀비로 남는다(부모=이 테스트 프로세스).
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if Status(pidPath) == Dead {
+			return // 좀비를 Dead로 정확히 판정
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatalf("좀비를 Dead로 판정하지 못함(status=%v)", Status(pidPath))
+}

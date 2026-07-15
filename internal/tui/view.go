@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"crc/internal/server"
+	"crc/internal/state"
 )
 
 var (
@@ -65,7 +66,7 @@ func (m model) listView() string {
 		if i == m.cursor {
 			prefix = "▸ "
 		}
-		line := prefix + renderRow(m.rows[i])
+		line := prefix + renderRow(m.rows[i], m.dir)
 		if i == m.cursor {
 			line = cursorRow.Render(line)
 		}
@@ -180,9 +181,15 @@ func renderCand(c addCand, cursor bool) string {
 	}
 }
 
-func renderRow(r row) string {
+func renderRow(r row, dir string) string {
 	st := r.st
 	mark := statusStyle[st].Render(statusMark[st])
 	status := statusStyle[st].Render(fmt.Sprintf("%-8s", st.String()))
-	return fmt.Sprintf("%s %-20s %s %s", mark, r.ws.Name, status, r.ws.Path)
+	up := ""
+	if st == server.Running {
+		if d, ok := server.Uptime(state.PidPath(dir, r.ws.Name)); ok {
+			up = "↑ " + server.HumanDuration(d)
+		}
+	}
+	return fmt.Sprintf("%s %-20s %s %-8s %s", mark, r.ws.Name, status, up, r.ws.Path)
 }
