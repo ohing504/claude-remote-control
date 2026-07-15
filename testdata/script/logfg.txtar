@@ -1,0 +1,13 @@
+# log/fg의 인자·등록 검증 표면 E2E. follow·실제 기동은 claude 의존이라 유닛 테스트가 담당.
+
+# 인자 없으면 에러
+! exec crc log
+stderr '이름이 필요'
+! exec crc fg
+stderr '이름이 필요'
+
+# 미등록 이름은 거부
+! exec crc log nope
+stderr '등록되지 않은 이름'
+! exec crc fg nope
+stderr '등록되지 않은 이름'

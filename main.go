@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 
 	"crc/internal/config"
@@ -37,6 +38,10 @@ func run(args []string) error {
 		return cmdDown(args[1:])
 	case "status":
 		return cmdStatus()
+	case "log":
+		return cmdLog(args[1:])
+	case "fg":
+		return cmdFg(args[1:])
 	case "-h", "--help", "help":
 		return cmdUsage()
 	default:
@@ -54,6 +59,8 @@ func cmdUsage() error {
   crc up   [name...]       서버 시작 (없으면 전체)
   crc down [name...]       서버 정지 (없으면 전체)
   crc status               전체 상태 판정
+  crc log  <name>          로그 실시간 추적 (tail -f, Ctrl-C 종료)
+  crc fg   <name>          포그라운드로 실행 (로그를 눈앞에서, Ctrl-C 종료)
 `)
 	return nil
 }
@@ -203,6 +210,57 @@ func cmdDown(names []string) error {
 		fmt.Printf("정지: %s\n", ws.Name)
 	}
 	return nil
+}
+
+func cmdLog(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("이름이 필요합니다: crc log <name>")
+	}
+	name := args[0]
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	if cfg.Find(name) == nil {
+		return fmt.Errorf("등록되지 않은 이름: %s", name)
+	}
+	dir, err := state.Dir()
+	if err != nil {
+		return err
+	}
+
+	// Ctrl-C로 follow를 끝낸다.
+	stop := make(chan struct{})
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt)
+	go func() {
+		<-sig
+		close(stop)
+	}()
+	return server.Tail(state.LogPath(dir, name), os.Stdout, stop)
+}
+
+func cmdFg(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("이름이 필요합니다: crc fg <name>")
+	}
+	name := args[0]
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	ws := cfg.Find(name)
+	if ws == nil {
+		return fmt.Errorf("등록되지 않은 이름: %s", name)
+	}
+	dir, err := state.EnsureDir()
+	if err != nil {
+		return err
+	}
+	s := server.Server{Name: ws.Name, Path: ws.Path}
+	return s.Foreground(dir)
 }
 
 func cmdStatus() error {

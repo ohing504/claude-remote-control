@@ -28,6 +28,20 @@ func (s Server) Start(dir string) error {
 	return startDetached(s.command(), pidPath, state.LogPath(dir, s.Name))
 }
 
+// Foreground는 서버를 현재 터미널에 붙여(blocking) 실행한다. 미심쩍을 때 로그를
+// 눈앞에서 보며 띄우는 용도라 detached하지 않고 pid 파일도 만들지 않는다.
+// 이미 detached로 떠 있으면 중복 기동을 거부한다.
+func (s Server) Foreground(dir string) error {
+	if Status(state.PidPath(dir, s.Name)) == Running {
+		return errors.New("이미 실행 중: " + s.Name)
+	}
+	cmd := s.command() // env 절대 규칙 + cmd.Dir 동일, Setsid 없음(터미널에 붙는다)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
 // startDetached는 커맨드를 백그라운드로 띄우고(부모가 죽어도 생존) pid를 기록한다.
 // 로그는 logPath로 리다이렉트한다. 테스트는 임의 cmd를 넘겨 생명주기를 검증한다.
 func startDetached(cmd *exec.Cmd, pidPath, logPath string) error {

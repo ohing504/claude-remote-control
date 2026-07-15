@@ -75,15 +75,18 @@
 
 | 규칙 | 동작 | 상태 |
 |---|---|---|
-| follow | `<name>.log`를 실시간 추적 | ⬜ M3 |
-| dead 원인 | 조기종료 서버의 원인이 로그에서 보임 | ⬜ M3 |
+| follow | `<name>.log`를 실시간 추적(폴링, 의존성 0), Ctrl-C 종료 | ✅ |
+| dead 원인 | 조기종료 서버의 원인이 로그에서 보임 | ✅ |
+| 미등록/인자 없음 | 이름 없거나 미등록이면 에러 | ✅ |
 
 ### `crc fg <name>`
 포그라운드 실행(현재 터미널 연결).
 
 | 규칙 | 동작 | 상태 |
 |---|---|---|
-| TTY 연결 | stdin/out/err를 현재 터미널에 연결, env 동일 | ⬜ M3 |
+| TTY 연결 | stdin/out/err를 현재 터미널에 연결, env 동일, `Setsid` 없음 | ✅ |
+| pid 미기록 | 눈앞 임시 실행 — pid 파일 안 만듦(`status`에 안 뜸) | ✅ |
+| 이미 실행 중 | detached로 떠 있으면 중복 기동 거부 | ✅ |
 
 ### `crc scan [root]`
 `root`(기본 `~/workspace`) 아래 CLAUDE.md/.claude 있는 디렉토리를 후보로 골라 등록.
@@ -106,9 +109,8 @@ bubbletea 상태판.
 
 완료된 항목은 위 표에서 ✅로 바꾸고 여기서 줄을 삭제한다. 아래는 **미완료 작업의 구현 순서**.
 
-- **완료**: M0(스캐폴드·config·ls·add), M0.5(품질 인프라: golangci-lint·lefthook·commit-msg 훅·테스트), M1(등록 CRUD), M2(생명주기 `up`/`down`/`status`·env 절대 규칙·상태 열·CLI E2E testscript). ※ M2 핵심 성공기준의 폰 도착 수동 검증만 남음(위 성공기준 참조).
+- **완료**: M0(스캐폴드·config·ls·add), M0.5(품질 인프라: golangci-lint·lefthook·commit-msg 훅·테스트), M1(등록 CRUD), M2(생명주기 `up`/`down`/`status`·env 절대 규칙·상태 열·CLI E2E testscript), M3(로그·포그라운드: `log` follow·`fg`, dead 원인 로그 노출 검증). ※ M2 핵심 성공기준의 폰 도착 수동 검증만 남음(위 성공기준 참조).
 
-1. **M3 · 로그·포그라운드** — `log`(tail -f), `fg`. 검증: dead 원인이 로그에서 보임.
-2. **M4 · TUI** — 상태판·토글·로그뷰. 검증: 상태색이 실제 프로세스와 일치, ↵ 토글 동작.
-3. **M5 · CLAUDE.md 스캔 등록** — `scan`. 검증: CLAUDE.md 있는 디렉토리만, `.git`·`node_modules` 스킵.
-4. **M6 · 다듬기·설치** — 상태색·업타임·dead 정리, `go build`로 `~/.local/bin/crc` 설치. 검증: 설치 바이너리로 전체 흐름 재현.
+1. **M4 · TUI** — 상태판·토글·로그뷰. 검증: 상태색이 실제 프로세스와 일치, ↵ 토글 동작.
+2. **M5 · CLAUDE.md 스캔 등록** — `scan`. 검증: CLAUDE.md 있는 디렉토리만, `.git`·`node_modules` 스킵.
+3. **M6 · 다듬기·설치** — 상태색·업타임·**dead 정리(좀비 reap 지연 오판 해소)**, `go build`로 `~/.local/bin/crc` 설치. 검증: 설치 바이너리로 전체 흐름 재현.
