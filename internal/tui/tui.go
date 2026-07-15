@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"crc/internal/config"
@@ -22,6 +23,7 @@ type mode int
 const (
 	modeList mode = iota
 	modeAdd
+	modeLog
 )
 
 // addFocus는 추가 화면에서 키 입력을 받는 영역이다(경로 입력창 ↔ 후보 목록).
@@ -50,8 +52,14 @@ type model struct {
 	dir    string // state 디렉토리(pid·log)
 	err    error
 	height int // 터미널 행 수(WindowSizeMsg로 갱신) — 리스트 스크롤 창 계산용
+	width  int // 터미널 열 수 — 로그 viewport 폭
 
 	pendingDelete bool // d로 삭제 확인 대기 중
+
+	// 로그뷰 상태.
+	viewport  viewport.Model
+	logName   string
+	logFollow bool // tail -f처럼 새 로그를 따라감
 
 	// 추가 화면 상태.
 	mode      mode
@@ -157,14 +165,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cursor = len(m.rows) - 1
 		}
 		return m, nil
+	case logTickMsg:
+		if m.mode != modeLog {
+			return m, nil // 로그뷰를 벗어났으면 follow tick 중단
+		}
+		m = m.loadLog()
+		return m, logTick()
 	case tea.WindowSizeMsg:
 		m.height = msg.Height
+		m.width = msg.Width
+		if m.mode == modeLog {
+			m.viewport.Width = msg.Width
+			m.viewport.Height = logHeight(msg.Height)
+		}
 		return m, nil
 	case tea.KeyMsg:
-		if m.mode == modeAdd {
+		switch m.mode {
+		case modeAdd:
 			return m.handleAddKey(msg)
+		case modeLog:
+			return m.handleLogKey(msg)
+		default:
+			return m.handleKey(msg)
 		}
-		return m.handleKey(msg)
 	}
 	return m, nil
 }
@@ -205,6 +228,8 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "f":
 		return m.foreground()
+	case "l":
+		return m.enterLog()
 	case "r":
 		return m, refreshCmd(m.dir)
 	}
