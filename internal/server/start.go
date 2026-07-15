@@ -10,8 +10,9 @@ import (
 	"crc/internal/state"
 )
 
-// command는 실행할 claude remote-control 커맨드를 구성한다(env 절대 규칙 적용).
-func (s Server) command() *exec.Cmd {
+// Command는 실행할 claude remote-control 커맨드를 구성한다(env 절대 규칙 적용).
+// TUI의 포그라운드 실행(tea.ExecProcess)도 이 커맨드를 쓴다.
+func (s Server) Command() *exec.Cmd {
 	// s.Name은 사용자가 등록한 워크스페이스 이름 — 프로세스 실행이 이 도구의 목적이다.
 	cmd := exec.Command("claude", "remote-control", "--name", s.Name) //nolint:gosec
 	cmd.Dir = s.Path
@@ -25,7 +26,7 @@ func (s Server) Start(dir string) error {
 	if Status(pidPath) == Running {
 		return errors.New("이미 실행 중: " + s.Name)
 	}
-	return startDetached(s.command(), pidPath, state.LogPath(dir, s.Name))
+	return startDetached(s.Command(), pidPath, state.LogPath(dir, s.Name))
 }
 
 // Foreground는 서버를 현재 터미널에 붙여(blocking) 실행한다. 미심쩍을 때 로그를
@@ -35,7 +36,7 @@ func (s Server) Foreground(dir string) error {
 	if Status(state.PidPath(dir, s.Name)) == Running {
 		return errors.New("이미 실행 중: " + s.Name)
 	}
-	cmd := s.command() // env 절대 규칙 + cmd.Dir 동일, Setsid 없음(터미널에 붙는다)
+	cmd := s.Command() // env 절대 규칙 + cmd.Dir 동일, Setsid 없음(터미널에 붙는다)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

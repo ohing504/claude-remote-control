@@ -45,7 +45,7 @@ func TestBuildEnvAbsoluteRule(t *testing.T) {
 // command()가 올바른 인자·작업 디렉토리·env를 구성하는지.
 func TestCommand(t *testing.T) {
 	s := Server{Name: "proj-a", Path: "/tmp/proj-a"}
-	cmd := s.command()
+	cmd := s.Command()
 
 	wantArgs := []string{"claude", "remote-control", "--name", "proj-a"}
 	if !slices.Equal(cmd.Args, wantArgs) {

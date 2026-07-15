@@ -58,8 +58,13 @@ func (m model) listView() string {
 	}
 	b.WriteString(moreHint(len(m.rows)-end, true))
 
-	b.WriteString("\n" + helpStyle.Render(
-		"↑↓/jk 이동 · ↵ 토글 · a 추가 · A 전체시작 · x 전체정지 · r 새로고침 · q 종료"))
+	if m.pendingDelete && len(m.rows) > 0 {
+		b.WriteString("\n" + errStyle.Render(
+			"삭제할까요? "+m.rows[m.cursor].ws.Name+" — y 확인 / 그 외 취소"))
+	} else {
+		b.WriteString("\n" + helpStyle.Render(
+			"↑↓/jk 이동 · ↵ 토글 · a 추가 · d 삭제 · f fg · A 전체시작 · x 전체정지 · r 새로고침 · q 종료"))
+	}
 	if m.err != nil {
 		b.WriteString("\n" + errStyle.Render("에러: "+m.err.Error()))
 	}

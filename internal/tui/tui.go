@@ -51,6 +51,8 @@ type model struct {
 	err    error
 	height int // 터미널 행 수(WindowSizeMsg로 갱신) — 리스트 스크롤 창 계산용
 
+	pendingDelete bool // d로 삭제 확인 대기 중
+
 	// 추가 화면 상태.
 	mode      mode
 	input     textinput.Model
@@ -168,6 +170,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// 삭제 확인 대기 중이면 y만 실행하고 나머지는 취소로 처리한다.
+	if m.pendingDelete {
+		m.pendingDelete = false
+		if msg.String() == "y" {
+			return m.doDelete()
+		}
+		return m, nil
+	}
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
@@ -189,6 +199,12 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, allCmd(m.dir, m.rows, true)
 	case "x":
 		return m, allCmd(m.dir, m.rows, false)
+	case "d":
+		if len(m.rows) > 0 {
+			m.pendingDelete = true
+		}
+	case "f":
+		return m.foreground()
 	case "r":
 		return m, refreshCmd(m.dir)
 	}
