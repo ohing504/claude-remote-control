@@ -6,7 +6,7 @@
 
 ## 설계 결정
 
-- **tmux 배제** — remote-control 서버는 로컬 TTY 불필요 데몬이라(조작은 폰·웹) tmux 핵심 가치인 양방향 attach가 무의미. 남는 건 백그라운드 유지·상태·로그뿐이고 셋 다 Go 표준 라이브러리로 됨 → **런타임 의존성 0**.
+- **tmux 배제** — remote-control 서버는 로컬 TTY 불필요 데몬이라(조작은 폰·웹) tmux 핵심 가치인 양방향 attach가 무의미. 남는 건 백그라운드 유지·상태·로그뿐이고 셋 다 Go 표준 라이브러리로 되니 tmux를 뺀다. 이건 *tmux가 이 용도에 안 맞아서*지 "의존성을 0으로"라는 규칙이 아니다 — **값어치 있는 Go 패키지는 쓴다**(TUI에 bubbletea/lipgloss, 필요하면 메뉴바에 systray 등). 지향점은 "설치가 번거로운 외부 런타임 없이 바이너리로 배포".
 - **env 주입 절대 규칙** — 서버 시작 모든 경로에 `CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE=1`을 주입하고 `CLAUDE_CODE_REMOTE`는 제거한다. 성공기준은 [`SPEC.md`](SPEC.md).
   - **TYPE=1이 켜는 것(실측 2.1.209)**: `SendUserFile`(파일→폰)과 첨부파일 업로드 경로뿐. remote 기능 *전체*가 아니라 이 둘만이다 — push 알림·`Workflow` 도구·`/rc` 명령 등 나머지는 실제 브리지 연결(`replBridgeActive`) 또는 `CLAUDE_CODE_REMOTE`가 필요하다. spawn된 자식은 브리지 밖이라, 이 env로 "브리지 연결된 척" 흉내 내 도구만 켠다. 빠지면 자식에서 `SendUserFile`이 안 떠 도구 존재 이유가 소멸.
   - **REMOTE 제거는 필수(실측)**: `CLAUDE_CODE_REMOTE=1`이 환경에 있으면 claude가 자신을 remote 자식으로 인식해 `Error: Remote Control is not available inside a cloud session.`로 기동을 거부한다. 로컬/cloud 무관하게 env 존재만으로 거부되므로, crc가 remote 세션 안에서 실행될 때 부모 env로 새어들지 않게 반드시 제거한다(`buildEnv`가 담당).

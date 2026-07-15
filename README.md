@@ -1,6 +1,6 @@
 # crc — claude-remote-control
 
-여러 프로젝트의 `claude remote-control` 서버를 한 화면에서 켜고·끄고·상태 보고·로그 보는 **Go 단일 바이너리 TUI**. tmux 등 런타임 의존성 없음.
+여러 프로젝트의 `claude remote-control` 서버를 한 화면에서 켜고·끄고·상태 보고·로그 보는 **Go TUI**. tmux 없이 바이너리 하나로 돈다.
 
 > **상태: 초기 구현 중.** 기능 명세·구현 상태는 [`docs/SPEC.md`](docs/SPEC.md), 설계 결정과 근거는 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)가 SSOT.
 
@@ -37,7 +37,7 @@ $ crc
 
 ## 왜 tmux가 아니라 Go 단일 바이너리인가
 
-remote-control 서버는 조작을 폰·웹에서 받는 **백그라운드 데몬**이다. 로컬 터미널로 attach할 일이 없다. 그래서 tmux의 핵심 가치인 양방향 attach가 이 용도에선 무의미하다. 남는 건 백그라운드 유지·상태·로그뿐이고 셋 다 Go 표준 라이브러리로 된다 → **런타임 의존성 0, 배포는 바이너리 하나 복사.** (이 판단의 전체 과정은 docs/ARCHITECTURE.md.)
+remote-control 서버는 조작을 폰·웹에서 받는 **백그라운드 데몬**이다. 로컬 터미널로 attach할 일이 없다. 그래서 tmux의 핵심 가치인 양방향 attach가 이 용도에선 무의미하다. 남는 건 백그라운드 유지·상태·로그뿐이고 셋 다 Go 표준 라이브러리로 된다 → tmux 같은 외부 런타임 없이 **바이너리 하나 복사로 배포.** 이건 tmux를 뺀 것이지 의존성을 금하는 게 아니다 — 값어치 있는 Go 패키지는 쓴다(TUI는 bubbletea/lipgloss). (이 판단의 전체 과정은 docs/ARCHITECTURE.md.)
 
 ## 설치·사용
 
