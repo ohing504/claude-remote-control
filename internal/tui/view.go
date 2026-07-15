@@ -42,17 +42,21 @@ func (m model) listView() string {
 	if len(m.rows) == 0 {
 		b.WriteString("  (등록된 워크스페이스 없음 — crc add <path>)\n")
 	}
-	for i, r := range m.rows {
+	// 터미널 높이를 넘으면 커서 기준 창만 그린다(제목2 + 도움말2 + 여유).
+	start, end := windowBounds(m.cursor, len(m.rows), visibleCount(m.height, 5))
+	b.WriteString(moreHint(start, false))
+	for i := start; i < end; i++ {
 		prefix := "  "
 		if i == m.cursor {
 			prefix = "▸ "
 		}
-		line := prefix + renderRow(r)
+		line := prefix + renderRow(m.rows[i])
 		if i == m.cursor {
 			line = cursorRow.Render(line)
 		}
 		b.WriteString(line + "\n")
 	}
+	b.WriteString(moreHint(len(m.rows)-end, true))
 
 	b.WriteString("\n" + helpStyle.Render(
 		"↑↓/jk 이동 · ↵ 토글 · a 추가 · A 전체시작 · x 전체정지 · r 새로고침 · q 종료"))
@@ -73,13 +77,17 @@ func (m model) addView() string {
 	}
 	b.WriteString(inputPrefix + m.input.View() + "\n\n")
 
-	b.WriteString(helpStyle.Render("후보 · "+m.addRoot) + "\n")
+	b.WriteString(helpStyle.Render(fmt.Sprintf("후보 %d · %s", len(m.cands), m.addRoot)) + "\n")
 	if len(m.cands) == 0 {
 		b.WriteString("  (이 폴더 아래 후보 없음 — 위 입력창으로 경로를 직접 추가)\n")
 	}
-	for i, c := range m.cands {
-		b.WriteString(renderCand(c, m.focus == focusList && i == m.addCursor) + "\n")
+	// 입력창3 + 제목2 + 헤더1 + 메시지1 + 도움말2 = 약 9줄을 리스트 밖이 차지.
+	start, end := windowBounds(m.addCursor, len(m.cands), visibleCount(m.height, 9))
+	b.WriteString(moreHint(start, false))
+	for i := start; i < end; i++ {
+		b.WriteString(renderCand(m.cands[i], m.focus == focusList && i == m.addCursor) + "\n")
 	}
+	b.WriteString(moreHint(len(m.cands)-end, true))
 
 	if m.addMsg != "" {
 		b.WriteString("\n" + m.addMsg)
@@ -87,6 +95,46 @@ func (m model) addView() string {
 	b.WriteString("\n\n" + helpStyle.Render(
 		"tab 포커스 전환 · space 선택 · ↵ 등록 · esc 취소"))
 	return b.String()
+}
+
+// visibleCount는 헤더·푸터(chrome)를 뺀, 리스트에 쓸 수 있는 행 수다.
+// height가 아직 안 들어왔으면(0) 넉넉한 기본을 쓴다.
+func visibleCount(height, chrome int) int {
+	if height <= 0 {
+		height = 24
+	}
+	v := height - chrome
+	if v < 3 {
+		v = 3 // 최소한 커서 주변은 보이게
+	}
+	return v
+}
+
+// windowBounds는 cursor가 항상 보이도록 [start,end) 창을 고른다(가능하면 가운데).
+func windowBounds(cursor, total, visible int) (int, int) {
+	if total <= visible {
+		return 0, total
+	}
+	start := cursor - visible/2
+	if start < 0 {
+		start = 0
+	}
+	if start+visible > total {
+		start = total - visible
+	}
+	return start, start + visible
+}
+
+// moreHint는 창 밖에 가려진 항목 수를 한 줄로 알린다(없으면 빈 문자열).
+func moreHint(hidden int, below bool) string {
+	if hidden <= 0 {
+		return ""
+	}
+	arrow := "↑"
+	if below {
+		arrow = "↓"
+	}
+	return helpStyle.Render(fmt.Sprintf("  %s %d개 더", arrow, hidden)) + "\n"
 }
 
 func renderCand(c addCand, cursor bool) string {

@@ -101,10 +101,8 @@ func (m model) registerPath(p string) model {
 		m.addMsg = "오류: " + err.Error()
 		return m
 	}
-	m.addMsg = "등록: " + filepath.Base(abs)
-	m.input.SetValue("")
 	markAlready(m.cands, abs) // 후보에 있으면 등록됨으로
-	return m
+	return m.exitAdd()        // 등록 완료 → 목록으로 복귀
 }
 
 func (m model) handleCandKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -144,13 +142,14 @@ func (m model) registerSelected() model {
 	}
 	switch {
 	case added == 0 && failed == 0:
-		m.addMsg = "선택된 후보 없음"
-	case failed == 0:
-		m.addMsg = fmt.Sprintf("%d개 등록", added)
+		m.addMsg = "선택된 후보 없음" // 머묾 — 아무것도 안 골랐으니
+		return m
+	case added == 0:
+		m.addMsg = fmt.Sprintf("%d개 실패(이름 중복 등)", failed) // 전부 실패 → 머물며 알림
+		return m
 	default:
-		m.addMsg = fmt.Sprintf("%d개 등록, %d개 실패(이름 중복 등)", added, failed)
+		return m.exitAdd() // 하나라도 등록 → 목록으로 복귀
 	}
-	return m
 }
 
 // addPath는 config에 워크스페이스 하나를 더해 저장한다.

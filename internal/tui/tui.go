@@ -49,6 +49,7 @@ type model struct {
 	cursor int
 	dir    string // state 디렉토리(pid·log)
 	err    error
+	height int // 터미널 행 수(WindowSizeMsg로 갱신) — 리스트 스크롤 창 계산용
 
 	// 추가 화면 상태.
 	mode      mode
@@ -153,6 +154,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.cursor >= len(m.rows) && len(m.rows) > 0 {
 			m.cursor = len(m.rows) - 1
 		}
+		return m, nil
+	case tea.WindowSizeMsg:
+		m.height = msg.Height
 		return m, nil
 	case tea.KeyMsg:
 		if m.mode == modeAdd {

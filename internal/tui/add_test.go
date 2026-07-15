@@ -92,11 +92,31 @@ func TestSelectAndRegister(t *testing.T) {
 	if len(cfg.Workspaces) != 2 {
 		t.Fatalf("등록 %d개, 2개 기대 (msg=%q)", len(cfg.Workspaces), m.addMsg)
 	}
+	// 등록 완료 → 목록 화면으로 복귀해야.
+	if m.mode != modeList {
+		t.Fatalf("등록 후 mode=%v, modeList 기대(복귀 안 함)", m.mode)
+	}
 	// 등록 후 후보는 already로 전환.
 	for _, c := range m.cands {
 		if !c.already {
 			t.Fatalf("등록 후 후보가 already 아님: %+v", c)
 		}
+	}
+}
+
+// 선택 없이 enter면 목록으로 나가지 않고 안내만 표시.
+func TestRegisterNoneStaysInAdd(t *testing.T) {
+	m := newAddModel(t)
+	nm, _ := m.handleKey(key("a"))
+	m = nm.(model)
+
+	nm, _ = m.handleAddKey(key("enter")) // 아무것도 선택 안 함
+	m = nm.(model)
+	if m.mode != modeAdd {
+		t.Fatalf("선택 없이 enter인데 mode=%v, modeAdd 유지 기대", m.mode)
+	}
+	if m.addMsg == "" {
+		t.Fatal("안내 메시지가 비어 있음")
 	}
 }
 
