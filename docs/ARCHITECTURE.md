@@ -12,6 +12,7 @@
   - **REMOTE 제거는 필수(실측)**: `CLAUDE_CODE_REMOTE=1`이 환경에 있으면 claude가 자신을 remote 자식으로 인식해 `Error: Remote Control is not available inside a cloud session.`로 기동을 거부한다. 로컬/cloud 무관하게 env 존재만으로 거부되므로, crc가 remote 세션 안에서 실행될 때 부모 env로 새어들지 않게 반드시 제거한다(`buildEnv`가 담당).
 - **Go 단일 바이너리 + bubbletea/lipgloss** — 배포 바이너리 하나, 실시간 상태판.
 - **포그라운드 모드** — 미심쩍을 때 백그라운드 대신 현재 터미널에 붙여 로그 보며 실행(`crc fg`).
+- **NFC 정규화** — macOS 파일명은 NFD(자모 분해)라 한글이 깨져 보이고 이름 매칭이 어긋난다. scan 후보 이름과 화면 표시(경로 포함)를 NFC로 정규화한다(`golang.org/x/text/unicode/norm`).
 
 ## 조사 결론 (4축)
 
@@ -20,7 +21,7 @@
 3. **기성 tmux 매니저 불충분** — sesh·smug·zellij·tmuxinator·tmuxp 중 "고정 세트 상태판 + 토글 + 로그"를 통째로 주는 것 없음. 각자 조각만 → 얇게 직접, tmux조차 없이.
 4. **Orca** — 채택 X(폰 주도 spawn 없음, 데스크톱 주도). 상태 인박스 UX(한 리스트 + 3상태)만 차용.
 5. **환경 라벨 커스텀 불가(실측 2.1.209)** — 폰/데스크탑 "환경 선택" 목록의 라벨은 claude가 `실제 디렉토리 basename + git 브랜치`로 자동 결정한다. `--name`(세션 계층이라 환경 라벨과 무관), `--remote-control-session-name-prefix`, 심링크(claude가 physical path로 resolve) **모두 무영향**을 실측 확인. ⟹ crc는 이 화면 라벨을 못 바꾼다. 서로 다른 경로라도 basename이 같으면(`~/a/ojju-studio` vs `~/b/ojju-studio`) 화면에서 같은 라벨로 충돌하며, crc의 경로 중복 거부는 *완전 동일 경로*만 막아 basename 충돌은 못 막는다. 따라서 crc는 화면 라벨 관리자가 아니라 **로컬 오케스트레이터 + 대조 도구**다(로컬 유일 name·전체 경로로 식별, 난립·좀비 정리).
-6. **로컬 실재 ≠ relay 표시(실측)** — 로컬 서버가 죽어도 claude.ai relay가 세션 레코드를 즉시 지우지 않아, 폰/데스크탑 목록엔 좀비가 잠시 남는다. crc의 상태 판정은 로컬 pid(`kill(pid,0)`) 기준이라 정확하고(stopped/dead), 화면 잔상은 relay 지연이라 crc가 못 고친다. 이 갈림이 오히려 "로컬 진실을 보여주는" crc의 존재 이유를 강화한다.
+6. **로컬 실재 ≠ relay 표시(실측)** — 로컬 서버가 죽어도 claude.ai relay가 세션 레코드를 즉시 지우지 않아, 폰/데스크탑 목록엔 좀비가 잠시 남는다. crc의 상태 판정은 로컬 pid(`kill(pid,0)` + darwin 좀비 sysctl) 기준이라 정확하고(stopped/dead), 화면 잔상은 relay 지연이라 crc가 못 고친다. 이 갈림이 오히려 "로컬 진실을 보여주는" crc의 존재 이유를 강화한다.
 
 ## 아키텍처 요약
 
@@ -37,7 +38,8 @@ config는 temp 파일 → rename으로 atomic하게 쓴다(토글마다 갱신�
 ### 프로세스 생명주기
 
 - **시작**: `exec.Command("claude","remote-control","--name",name)`, `cmd.Dir=path`, `Env += CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE=1`, stdout/stderr→로그, `SysProcAttr{Setsid:true}`(부모 죽어도 생존), PID 기록.
-- **판정**: PID `kill(pid,0)` → running / stopped / dead(pid 있으나 프로세스 없음=조기종료).
+- **판정**: PID `kill(pid,0)` → running / stopped / dead(pid 있으나 프로세스 없음=조기종료). **단 `kill(0)`은 좀비도 통과**하므로, crc가 `Setsid` 자식을 wait하지 않아 생기는 좀비를 running으로 오판하지 않도록 darwin은 `sysctl("kern.proc.pid")`의 `P_stat==SZOMB`로 좀비를 감지해 **dead로 판정**한다(그 외 플랫폼은 signal 0만; `proc_darwin.go`/`proc_other.go`로 분리).
+- **업타임**: running이면 pid 파일 mtime(=시작 시각) 기준 경과 시간을 파생 표시(`Uptime`).
 - **정지**: SIGTERM→(잔존 시)SIGKILL, pid 정리.
 - **포그라운드**: stdin/out/err를 현재 터미널에 연결, env 동일.
 
@@ -54,7 +56,13 @@ os.WriteFile(pidPath, []byte(strconv.Itoa(cmd.Process.Pid)), 0644)
 
 ### CLAUDE.md 스캔
 
-`filepath.WalkDir`로 CLAUDE.md/.claude 있는 디렉토리 수집(깊이 상한, `.git`·`node_modules` 스킵). fd/find 불필요.
+`filepath.WalkDir`로 CLAUDE.md/.claude 있는 디렉토리 수집. fd/find 불필요(macOS 실측 홈 스캔 0.15초대).
+
+- **스킵**: 모든 숨김 디렉토리(`.` 접두 — `.git`·`.cache`·`.Trash` 등) + `node_modules`, 깊이 상한(기본 4). `.claude` 마커는 부모에서 `Stat`으로 감지하므로 그 안에 진입할 필요가 없다.
+- **중첩 미스킵**: 프로젝트를 찾아도 서브트리를 스킵하지 않는다 — 상위가 마커를 가져도(예: `~/workspace/.claude`) 하위 프로젝트를 가리지 않기 위함. 중첩 노이즈는 깊이 상한으로만 제한하고, 취사선택은 TUI 멀티선택에 맡긴다.
+- **심링크**: `WalkDir`는 심링크를 따라가지 않으므로(순환 위험), 심링크가 프로젝트 디렉토리를 가리키면 후보에 넣되 그 안으로는 진입하지 않는다(예: `~/Second Brain`).
+- **NFC 정규화**: macOS 파일명은 NFD(자모 분해)라, 그대로 두면 한글이 깨져 보이고 이름 매칭도 어긋난다. 후보 이름을 NFC로 정규화한다.
+- **비동기(TUI)**: 넓은 트리(홈 등)에서 UI가 멈추지 않도록 추가 화면의 스캔은 goroutine(`tea.Cmd`)으로 돌리고 완료 시 목록을 채운다.
 
 ### TUI (기술 접근)
 
