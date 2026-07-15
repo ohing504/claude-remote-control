@@ -5,10 +5,14 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"golang.org/x/text/unicode/norm"
 
 	"crc/internal/server"
 	"crc/internal/state"
 )
+
+// disp는 macOS의 NFD 파일명을 화면 표시용 NFC로 정규화한다(한글 깨짐 방지).
+func disp(s string) string { return norm.NFC.String(s) }
 
 var (
 	titleStyle = lipgloss.NewStyle().Bold(true)
@@ -176,7 +180,7 @@ func renderCand(c addCand, cursor bool) string {
 	case c.selected:
 		box = "[x]"
 	}
-	line := fmt.Sprintf("%s%s %-20s %s", prefix, box, c.c.Name, c.c.Path)
+	line := fmt.Sprintf("%s%s %-20s %s", prefix, box, disp(c.c.Name), disp(c.c.Path))
 	switch {
 	case c.already:
 		return helpStyle.Render(line + "  (등록됨)")
@@ -197,5 +201,5 @@ func renderRow(r row, dir string) string {
 			up = "↑ " + server.HumanDuration(d)
 		}
 	}
-	return fmt.Sprintf("%s %-20s %s %-8s %s", mark, r.ws.Name, status, up, r.ws.Path)
+	return fmt.Sprintf("%s %-20s %s %-8s %s", mark, disp(r.ws.Name), status, up, disp(r.ws.Path))
 }

@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 // DefaultMaxDepth는 root 기준 탐색 깊이 상한이다. 워크스페이스 루트는 보통 얕게 놓인다.
@@ -27,6 +29,16 @@ func Find(root string, maxDepth int) ([]Candidate, error) {
 		if err != nil {
 			return nil // 권한 없는 하위 등은 조용히 건너뜀
 		}
+		// 심링크가 프로젝트 디렉토리를 가리키면 후보에 넣되, 그 안으로는 진입하지 않는다
+		// (WalkDir는 심링크를 따라가지 않고, 따라가면 순환 위험이 있다). 예: ~/Second Brain.
+		if d.Type()&fs.ModeSymlink != 0 {
+			if fi, e := os.Stat(path); e == nil && fi.IsDir() {
+				if marker := ProjectMarker(path); marker != "" {
+					out = append(out, newCandidate(path, marker))
+				}
+			}
+			return nil
+		}
 		if !d.IsDir() {
 			return nil
 		}
@@ -42,17 +54,19 @@ func Find(root string, maxDepth int) ([]Candidate, error) {
 			return fs.SkipDir
 		}
 		if marker := ProjectMarker(path); marker != "" {
-			out = append(out, Candidate{Path: path, Name: filepath.Base(path), Marker: marker})
-			// 하위에서 프로젝트를 찾으면 그 서브트리는 더 안 본다 — 최상위 프로젝트만
-			// 후보로 남겨 서브패키지·third-parties의 중첩 CLAUDE.md를 거른다.
-			// root 자신이 마커를 가져도(예: ~/workspace/.claude) 하위 탐색은 계속한다.
-			if path != root {
-				return fs.SkipDir
-			}
+			out = append(out, newCandidate(path, marker))
+			// 서브트리를 스킵하지 않는다 — 상위가 마커를 가져도(예: ~/workspace/.claude)
+			// 그 아래 프로젝트를 가리지 않게. 중첩 노이즈는 깊이 상한으로만 제한한다.
 		}
 		return nil
 	})
 	return out, err
+}
+
+// newCandidate는 후보를 만들며 이름을 NFC로 정규화한다.
+// macOS 파일명은 NFD(자모 분해)라 그대로 두면 한글이 깨져 보이고 이름 매칭도 어긋난다.
+func newCandidate(path, marker string) Candidate {
+	return Candidate{Path: path, Name: norm.NFC.String(filepath.Base(path)), Marker: marker}
 }
 
 // ProjectMarker는 디렉토리가 프로젝트임을 나타내는 표식을 반환한다(없으면 "").

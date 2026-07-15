@@ -90,10 +90,9 @@ func TestFindDepthLimit(t *testing.T) {
 	}
 }
 
-// 프로젝트 안에 중첩된 프로젝트(서브패키지·third-parties)는 최상위만 후보.
-func TestFindSkipsNestedProjects(t *testing.T) {
+// 상위가 마커를 가져도 그 아래 프로젝트를 가리지 않는다(서브트리 스킵 안 함).
+func TestFindDoesNotHideNested(t *testing.T) {
 	root := t.TempDir()
-	// top이 프로젝트이고 그 아래 apps/sub, third-parties/lib도 마커를 가진다.
 	mk := func(rel string) {
 		dir := filepath.Join(root, rel)
 		if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -103,16 +102,63 @@ func TestFindSkipsNestedProjects(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	mk("top")
-	mk("top/apps/sub")
-	mk("top/third-parties/lib")
+	mk("container") // 상위(예: ~/workspace)도 마커를 가질 수 있음
+	mk("container/proj-a")
+	mk("container/proj-b")
 
 	cands, err := Find(root, DefaultMaxDepth)
 	if err != nil {
 		t.Fatalf("Find: %v", err)
 	}
-	if got := names(cands); !slices.Equal(got, []string{"top"}) {
-		t.Fatalf("후보=%v, [top]만 기대(중첩은 스킵)", got)
+	got := names(cands)
+	want := []string{"container", "proj-a", "proj-b"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("후보=%v, %v 기대(하위도 보여야)", got, want)
+	}
+}
+
+// 심링크가 프로젝트를 가리키면 후보에 포함한다(예: ~/Second Brain).
+func TestFindFollowsSymlinkToProject(t *testing.T) {
+	root := t.TempDir()
+	// 실제 프로젝트는 root 밖에 두고, root 안에 심링크만 놓는다.
+	realDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(realDir, "CLAUDE.md"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, "brain")
+	if err := os.Symlink(realDir, link); err != nil {
+		t.Fatal(err)
+	}
+	cands, err := Find(root, DefaultMaxDepth)
+	if err != nil {
+		t.Fatalf("Find: %v", err)
+	}
+	if got := names(cands); !slices.Equal(got, []string{"brain"}) {
+		t.Fatalf("후보=%v, [brain] 기대(심링크 프로젝트)", got)
+	}
+}
+
+// NFD 파일명(자모 분해)이 후보 이름에서 NFC로 정규화되는지.
+func TestFindNormalizesNFD(t *testing.T) {
+	root := t.TempDir()
+	// 파일명을 NFD(자모 분해)로 만들고 후보 이름이 NFC로 합쳐지는지 본다.
+	nfd := "\u1100\u1161" // NFD: 초성 ㄱ + 중성 ㅏ → NFC로 U+AC00("가")
+	dir := filepath.Join(root, nfd)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cands, err := Find(root, DefaultMaxDepth)
+	if err != nil {
+		t.Fatalf("Find: %v", err)
+	}
+	if len(cands) != 1 {
+		t.Fatalf("후보 %d개, 1개 기대", len(cands))
+	}
+	if cands[0].Name != "\uAC00" { // NFC "가"
+		t.Fatalf("이름=%q(% x), NFC '가' 기대", cands[0].Name, cands[0].Name)
 	}
 }
 

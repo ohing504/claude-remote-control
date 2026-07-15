@@ -8,6 +8,8 @@ import (
 	"os/signal"
 	"path/filepath"
 
+	"golang.org/x/text/unicode/norm"
+
 	"crc/internal/config"
 	"crc/internal/scan"
 	"crc/internal/server"
@@ -91,7 +93,7 @@ func cmdLs() error {
 				up = "↑ " + server.HumanDuration(d)
 			}
 		}
-		fmt.Printf("%-20s %-8s %-8s %s\n", ws.Name, st, up, ws.Path)
+		fmt.Printf("%-20s %-8s %-8s %s\n", norm.NFC.String(ws.Name), st, up, norm.NFC.String(ws.Path))
 	}
 	return nil
 }
@@ -306,7 +308,7 @@ func cmdScan(args []string) error {
 		if cfg.FindByPath(c.Path) != nil {
 			suffix = "  (등록됨)"
 		}
-		fmt.Printf("%-40s [%s]%s\n", c.Path, c.Marker, suffix)
+		fmt.Printf("%-40s [%s]%s\n", norm.NFC.String(c.Path), c.Marker, suffix)
 	}
 	return nil
 }
