@@ -4,6 +4,8 @@
 
 > 등록·생명주기·상태판 TUI·scan·로그·설치까지 동작한다. 기능 명세는 [`docs/SPEC.md`](docs/SPEC.md), 설계 결정과 근거는 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)가 SSOT.
 
+![crc 데모](demo/demo.gif)
+
 ## 왜 만드나
 
 폰·브라우저(claude.ai/code)에서 여러 워크스페이스를 오가며 `claude remote-control`로 작업한다. 서버를 프로젝트마다 하나씩 띄워야 하는데, 그 관리가 번거로웠다.

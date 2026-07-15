@@ -1,6 +1,8 @@
 # build
 /crc
 /dist/
+demo/bin/crc
+demo/.state/
 
 # logs
 *.log

@@ -1,0 +1,7 @@
+#!/bin/sh
+# 데모용 가짜 claude — 실제 remote-control 서버 대신 살아만 있어 crc가 running으로 보이게 한다.
+# 진짜 claude를 호출하지 않으므로 데모는 오프라인·결정적이다.
+echo "remote-control 서버 시작 (데모)"
+echo "workspace: $(pwd)"
+echo "listening…"
+exec sleep 100000
