@@ -20,7 +20,7 @@
 2. **env 게이트** — 자식은 도구를 여는 코드 경로(`replBridgeActive`)가 구조적으로 없어 env 게이트를 타야 함. `CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE`만 게이트를 열고 cloud 거부 가드엔 안 걸림. Claude Code 2.1.208 실측.
 3. **기성 tmux 매니저 불충분** — sesh·smug·zellij·tmuxinator·tmuxp 중 "고정 세트 상태판 + 토글 + 로그"를 통째로 주는 것 없음. 각자 조각만 → 얇게 직접, tmux조차 없이.
 4. **Orca** — 채택 X(폰 주도 spawn 없음, 데스크톱 주도). 상태 인박스 UX(한 리스트 + 3상태)만 차용.
-5. **환경 라벨 커스텀 불가(실측 2.1.209)** — 폰/데스크탑 "환경 선택" 목록의 라벨은 claude가 `실제 디렉토리 basename + git 브랜치`로 자동 결정한다. `--name`(세션 계층이라 환경 라벨과 무관), `--remote-control-session-name-prefix`, 심링크(claude가 physical path로 resolve) **모두 무영향**을 실측 확인. ⟹ crc는 이 화면 라벨을 못 바꾼다. 서로 다른 경로라도 basename이 같으면(`~/a/ojju-studio` vs `~/b/ojju-studio`) 화면에서 같은 라벨로 충돌하며, crc의 경로 중복 거부는 *완전 동일 경로*만 막아 basename 충돌은 못 막는다. 따라서 crc는 화면 라벨 관리자가 아니라 **로컬 오케스트레이터 + 대조 도구**다(로컬 유일 name·전체 경로로 식별, 난립·좀비 정리).
+5. **환경 라벨 커스텀 불가(실측 2.1.209)** — 폰/데스크탑 "환경 선택" 목록의 라벨은 claude가 `실제 디렉토리 basename + git 브랜치`로 자동 결정한다. `--name`(세션 계층이라 환경 라벨과 무관), `--remote-control-session-name-prefix`, 심링크(claude가 physical path로 resolve) **모두 무영향**을 실측 확인. ⟹ crc는 이 화면 라벨을 못 바꾼다. 서로 다른 경로라도 basename이 같으면(`~/a/my-app` vs `~/b/my-app`) 화면에서 같은 라벨로 충돌하며, crc의 경로 중복 거부는 *완전 동일 경로*만 막아 basename 충돌은 못 막는다. 따라서 crc는 화면 라벨 관리자가 아니라 **로컬 오케스트레이터 + 대조 도구**다(로컬 유일 name·전체 경로로 식별, 난립·좀비 정리).
 6. **로컬 실재 ≠ relay 표시(실측)** — 로컬 서버가 죽어도 claude.ai relay가 세션 레코드를 즉시 지우지 않아, 폰/데스크탑 목록엔 좀비가 잠시 남는다. crc의 상태 판정은 로컬 pid(`kill(pid,0)` + darwin 좀비 sysctl) 기준이라 정확하고(stopped/dead), 화면 잔상은 relay 지연이라 crc가 못 고친다. 이 갈림이 오히려 "로컬 진실을 보여주는" crc의 존재 이유를 강화한다.
 
 ## 아키텍처 요약
