@@ -286,9 +286,9 @@ func TestStartDropsStdoutKeepsStderr(t *testing.T) {
 	if strings.Contains(string(gotErr), "화면반복") {
 		t.Fatalf("stdout이 err 파일에 섞임: %q", gotErr)
 	}
-	// stdout은 버려지므로 crc가 로그 파일을 만들지 않는다(서버가 --debug-file로 직접 쓴다).
-	if _, err := os.Stat(logPath); !os.IsNotExist(err) {
-		t.Fatal("crc가 로그 파일을 만들었다 — 서버가 쓸 파일이다")
+	// crc는 빈 로그 파일만 미리 만들고, 내용은 서버가 --debug-file로 쓴다.
+	if fi, err := os.Stat(logPath); err != nil || fi.Size() != 0 {
+		t.Fatalf("로그 파일에 stdout이 흘러들어감: size=%v, err=%v", fi, err)
 	}
 }
 
@@ -322,10 +322,55 @@ func TestStartTrimsOversizedLogDir(t *testing.T) {
 		t.Cleanup(func() { _ = Stop(pidPath) })
 	}
 
-	if _, err := os.Stat(big); !os.IsNotExist(err) {
-		t.Fatal("상한 초과 로그 디렉토리가 안 비워짐")
+	// 디렉토리를 비운 뒤 빈 로그 파일만 다시 만든다.
+	if fi, err := os.Stat(big); err != nil || fi.Size() != 0 {
+		t.Fatalf("상한 초과 로그가 안 비워짐: size=%v, err=%v", fi, err)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(big), "session.log")); !os.IsNotExist(err) {
+		t.Fatal("함께 쌓인 세션 로그가 안 지워짐")
 	}
 	if b, err := os.ReadFile(small); err != nil || !strings.Contains(string(b), "이전 실행 기록") {
 		t.Fatalf("상한 이하 로그가 사라짐: %q, %v", b, err)
+	}
+}
+
+// 시작 직후 진단 로그 파일이 존재하는지. 서버가 파일을 만들기까지 시간이 걸려
+// 그전에 `crc log`를 부르면 "파일 없음"으로 실패했다.
+func TestStartCreatesLogFileUpfront(t *testing.T) {
+	dir := t.TempDir()
+	pidPath := state.PidPath(dir, "x")
+	logPath := state.LogPath(dir, "x")
+
+	// 진단 로그를 쓰지 않는 프로그램으로도 파일이 있어야 한다.
+	if err := startDetached(exec.Command("sleep", "30"), pidPath, logPath, state.ErrPath(dir, "x")); err != nil {
+		t.Fatalf("startDetached: %v", err)
+	}
+	t.Cleanup(func() { _ = Stop(pidPath) })
+
+	if _, err := os.Stat(logPath); err != nil {
+		t.Fatalf("시작 직후 로그 파일이 없음: %v", err)
+	}
+}
+
+// 미리 만드는 동작이 이전 실행 기록을 지우지 않는지(서버가 이어쓴다).
+func TestStartKeepsExistingLogContent(t *testing.T) {
+	dir := t.TempDir()
+	logPath := state.LogPath(dir, "x")
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(logPath, []byte("이전 실행 기록\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	pidPath := state.PidPath(dir, "x")
+	if err := startDetached(exec.Command("sleep", "30"), pidPath, logPath, state.ErrPath(dir, "x")); err != nil {
+		t.Fatalf("startDetached: %v", err)
+	}
+	t.Cleanup(func() { _ = Stop(pidPath) })
+
+	b, err := os.ReadFile(logPath)
+	if err != nil || !strings.Contains(string(b), "이전 실행 기록") {
+		t.Fatalf("이전 기록이 사라짐: %q, %v", b, err)
 	}
 }

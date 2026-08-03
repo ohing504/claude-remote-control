@@ -74,6 +74,12 @@ func startDetached(cmd *exec.Cmd, pidPath, logPath, errPath string) error {
 		return err
 	}
 
+	// 서버가 진단 로그를 만들기까지 시간이 걸려, 그전에 `crc log`를 부르면 파일이
+	// 없어 실패한다. 빈 파일을 미리 만들어 둔다(서버는 이어쓰므로 내용은 안전하다).
+	if f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil { //nolint:gosec // logPath는 내부에서 구성한 상태 경로
+		_ = f.Close()
+	}
+
 	errFile, err := os.OpenFile(errPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600) //nolint:gosec // errPath는 내부에서 구성한 상태 경로
 	if err != nil {
 		return err
