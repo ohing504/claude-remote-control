@@ -54,7 +54,8 @@ type model struct {
 	height int // 터미널 행 수(WindowSizeMsg로 갱신) — 리스트 스크롤 창 계산용
 	width  int // 터미널 열 수 — 로그 viewport 폭
 
-	pendingDelete bool // d로 삭제 확인 대기 중
+	pendingDelete  bool // d로 삭제 확인 대기 중
+	pendingRestart bool // r로 재시작 확인 대기 중(실행 중인 서버만)
 
 	// 로그뷰 상태.
 	viewport  viewport.Model
@@ -225,11 +226,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// 삭제 확인 대기 중이면 y만 실행하고 나머지는 취소로 처리한다.
+	// 확인 대기 중이면 y만 실행하고 나머지는 취소로 처리한다.
 	if m.pendingDelete {
 		m.pendingDelete = false
 		if msg.String() == "y" {
 			return m.doDelete()
+		}
+		return m, nil
+	}
+	if m.pendingRestart {
+		m.pendingRestart = false
+		if msg.String() == "y" && len(m.rows) > 0 {
+			return m, restartCmd(m.dir, m.rows[m.cursor])
 		}
 		return m, nil
 	}
@@ -263,9 +271,16 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "l":
 		return m.enterLog()
 	case "r":
-		if len(m.rows) > 0 {
-			return m, restartCmd(m.dir, m.rows[m.cursor])
+		if len(m.rows) == 0 {
+			return m, nil
 		}
+		// 실행 중인 서버를 재시작하면 그 아래 세션과 세션이 돌리던 명령까지 끊긴다.
+		// 안 떠 있으면 잃을 게 없으므로 바로 시작한다.
+		if m.rows[m.cursor].st == server.Running {
+			m.pendingRestart = true
+			return m, nil
+		}
+		return m, restartCmd(m.dir, m.rows[m.cursor])
 	}
 	return m, nil
 }

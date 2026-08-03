@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 
 	"crc/internal/config"
+	"crc/internal/server"
 )
 
 // 격리 환경에 워크스페이스 두 개를 심은 목록 model을 만든다.
@@ -93,5 +94,42 @@ func TestToggleFailureSurfaces(t *testing.T) {
 	}
 	if msg.err == nil {
 		t.Fatal("시작 실패가 err로 안 올라옴")
+	}
+}
+
+// 실행 중인 서버는 r을 눌러도 바로 재시작하지 않고 확인을 받는지.
+func TestRestartRunningAsksConfirm(t *testing.T) {
+	m := newListModel(t)
+	m.rows[0].st = server.Running
+
+	nm, cmd := m.handleKey(key("r"))
+	m = nm.(model)
+	if !m.pendingRestart {
+		t.Fatal("실행 중인데 확인 대기로 안 들어감")
+	}
+	if cmd != nil {
+		t.Fatal("확인 전에 재시작이 실행됨")
+	}
+	// y가 아니면 취소.
+	nm, cmd = m.handleKey(key("n"))
+	if nm.(model).pendingRestart {
+		t.Fatal("취소 후에도 확인 대기 중")
+	}
+	if cmd != nil {
+		t.Fatal("취소했는데 재시작이 실행됨")
+	}
+}
+
+// 안 떠 있는 서버는 확인 없이 바로 시작하는지(엔터 두 번을 없애려던 목적).
+func TestRestartStoppedRunsImmediately(t *testing.T) {
+	m := newListModel(t)
+	m.rows[0].st = server.Stopped
+
+	nm, cmd := m.handleKey(key("r"))
+	if nm.(model).pendingRestart {
+		t.Fatal("안 떠 있는데 확인을 요구함")
+	}
+	if cmd == nil {
+		t.Fatal("재시작이 실행되지 않음")
 	}
 }
