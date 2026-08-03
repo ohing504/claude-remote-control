@@ -1,12 +1,14 @@
 package tui
 
 import (
+	"io"
 	"os"
 	"time"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"crc/internal/server"
 	"crc/internal/state"
 )
 
@@ -49,9 +51,11 @@ func (m model) exitLog() model {
 	return m
 }
 
-// loadLog는 로그 파일을 읽어 viewport에 채운다. follow면 맨 아래로 스크롤.
+// loadLog는 로그 파일의 마지막 부분을 읽어 viewport에 채운다. follow면 맨 아래로
+// 스크롤. 진단 로그는 재시작 사이에 이어 쌓여 수 MB가 되고 follow는 500ms마다
+// 다시 읽으므로, 전체를 읽으면 그 크기를 초당 두 번 읽고 다시 그리게 된다.
 func (m model) loadLog() model {
-	data, err := os.ReadFile(state.LogPath(m.dir, m.logName)) //nolint:gosec // 내부 상태 경로
+	data, err := readTail(state.LogPath(m.dir, m.logName), server.TailBytes)
 	if err != nil {
 		m.viewport.SetContent("(로그 없음 — 아직 실행한 적 없거나 파일이 지워짐)")
 		return m
@@ -81,4 +85,24 @@ func (m model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.logFollow = false
 	}
 	return m, cmd
+}
+
+// readTail은 파일의 마지막 limit 바이트를 읽는다. 그보다 작으면 전체를 읽는다.
+func readTail(path string, limit int64) ([]byte, error) {
+	f, err := os.Open(path) //nolint:gosec // 내부 상태 경로
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+
+	fi, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if fi.Size() > limit {
+		if _, err := f.Seek(-limit, io.SeekEnd); err != nil {
+			return nil, err
+		}
+	}
+	return io.ReadAll(f)
 }

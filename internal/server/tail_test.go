@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,6 +35,9 @@ func (s *safeBuf) String() string {
 func TestTailFollows(t *testing.T) {
 	dir := t.TempDir()
 	logPath := state.LogPath(dir, "x")
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o700); err != nil {
+		t.Fatalf("픽스처: %v", err)
+	}
 	if err := os.WriteFile(logPath, []byte("line1\n"), 0o600); err != nil {
 		t.Fatalf("픽스처: %v", err)
 	}

@@ -28,6 +28,9 @@ func newLogModel(t *testing.T, logBody string) model {
 		t.Fatalf("state dir: %v", err)
 	}
 	if logBody != "" {
+		if err := os.MkdirAll(state.LogDir(stateDir, "proj-a"), 0o700); err != nil {
+			t.Fatalf("로그 픽스처: %v", err)
+		}
 		if err := os.WriteFile(state.LogPath(stateDir, "proj-a"), []byte(logBody), 0o600); err != nil {
 			t.Fatalf("로그 픽스처: %v", err)
 		}

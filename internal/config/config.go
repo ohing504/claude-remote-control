@@ -117,7 +117,27 @@ func (c *Config) FindByPath(path string) *Workspace {
 }
 
 // Add는 워크스페이스를 추가한다. 이름 또는 경로가 중복이면 에러.
+// ValidateName은 워크스페이스 이름이 파일 경로로 쓰기에 안전한지 확인한다.
+// 이름은 pid 파일명과 로그 디렉토리명이 되므로, 경로 구분자나 `..`가 들어가면
+// 상태 디렉토리 밖을 가리키게 된다. 로그 디렉토리는 시작할 때 통째로 지워지므로
+// 그 대상이 사용자 파일이 될 수 있다.
+func ValidateName(name string) error {
+	if strings.TrimSpace(name) == "" {
+		return errors.New("이름이 비어 있습니다")
+	}
+	if strings.ContainsAny(name, `/\`) {
+		return errors.New("이름에 경로 구분자를 쓸 수 없습니다: " + name)
+	}
+	if strings.HasPrefix(name, ".") {
+		return errors.New("이름을 .으로 시작할 수 없습니다: " + name)
+	}
+	return nil
+}
+
 func (c *Config) Add(ws Workspace) error {
+	if err := ValidateName(ws.Name); err != nil {
+		return err
+	}
 	if c.Find(ws.Name) != nil {
 		return errors.New("이미 등록된 이름: " + ws.Name)
 	}
