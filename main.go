@@ -195,15 +195,17 @@ func cmdUp(names []string) error {
 	if err != nil {
 		return err
 	}
-	for i, ws := range targets {
-		if i > 0 {
+	started := 0
+	for _, ws := range targets {
+		if started > 0 {
 			time.Sleep(server.StartInterval) // 등록 요청이 몰리면 429로 거부된다
 		}
 		s := server.Server{Name: ws.Name, Path: ws.Path}
 		if err := s.Start(dir); err != nil {
 			fmt.Fprintf(os.Stderr, "  %s: %v\n", ws.Name, err)
-			continue
+			continue // 이미 떠 있어 건너뛴 경우까지 기다리지 않는다
 		}
+		started++
 		fmt.Printf("시작: %s\n", ws.Name)
 	}
 	return nil
