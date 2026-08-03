@@ -127,15 +127,25 @@ func refreshCmd(dir string) tea.Cmd {
 // Stop은 최대 ~2초 블로킹할 수 있어 Cmd(별도 goroutine)로 돌려 UI를 막지 않는다.
 func toggleCmd(dir string, r row) tea.Cmd {
 	return func() tea.Msg {
+		var opErr error
 		if r.st == server.Running {
-			_ = server.StopByName(dir, r.ws.Name)
+			opErr = server.StopByName(dir, r.ws.Name)
 		} else {
 			s := server.Server{Name: r.ws.Name, Path: r.ws.Path}
-			_ = s.Start(dir)
+			opErr = s.Start(dir)
 		}
-		rows, err := loadRows(dir)
-		return refreshMsg{rows: rows, err: err}
+		return refreshAfter(dir, opErr)
 	}
+}
+
+// refreshAfter는 조작 결과를 목록 갱신과 함께 돌려준다. 조작 실패는 사용자가 방금
+// 누른 키의 결과라 목록 로드 실패보다 먼저 보여준다.
+func refreshAfter(dir string, opErr error) refreshMsg {
+	rows, err := loadRows(dir)
+	if opErr != nil {
+		err = opErr
+	}
+	return refreshMsg{rows: rows, err: err}
 }
 
 // restartCmd는 선택 행을 정지 후 다시 띄운다. 프로세스는 살아 있는데 응답만 멎은
@@ -143,9 +153,7 @@ func toggleCmd(dir string, r row) tea.Cmd {
 func restartCmd(dir string, r row) tea.Cmd {
 	return func() tea.Msg {
 		s := server.Server{Name: r.ws.Name, Path: r.ws.Path}
-		_ = s.Restart(dir)
-		rows, err := loadRows(dir)
-		return refreshMsg{rows: rows, err: err}
+		return refreshAfter(dir, s.Restart(dir))
 	}
 }
 

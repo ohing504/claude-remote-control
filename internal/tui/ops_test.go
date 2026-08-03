@@ -67,3 +67,31 @@ func TestDeleteCancelled(t *testing.T) {
 		t.Fatalf("취소했는데 %d개로 변함", len(cfg.Workspaces))
 	}
 }
+
+// 재시작이 실패하면 화면에 에러가 뜨는지(조용히 묻히지 않는지).
+func TestRestartFailureSurfaces(t *testing.T) {
+	m := newListModel(t)
+	t.Setenv("PATH", "") // claude를 찾을 수 없게 만들어 시작을 실패시킨다
+
+	msg, ok := restartCmd(m.dir, m.rows[0])().(refreshMsg)
+	if !ok {
+		t.Fatal("refreshMsg가 아님")
+	}
+	if msg.err == nil {
+		t.Fatal("재시작 실패가 err로 안 올라옴")
+	}
+}
+
+// 토글(시작)이 실패해도 마찬가지.
+func TestToggleFailureSurfaces(t *testing.T) {
+	m := newListModel(t)
+	t.Setenv("PATH", "")
+
+	msg, ok := toggleCmd(m.dir, m.rows[0])().(refreshMsg)
+	if !ok {
+		t.Fatal("refreshMsg가 아님")
+	}
+	if msg.err == nil {
+		t.Fatal("시작 실패가 err로 안 올라옴")
+	}
+}
