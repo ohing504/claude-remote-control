@@ -12,6 +12,7 @@
   - **REMOTE 제거는 필수(실측)**: `CLAUDE_CODE_REMOTE=1`이 환경에 있으면 claude가 자신을 remote 자식으로 인식해 `Error: Remote Control is not available inside a cloud session.`로 기동을 거부한다. 로컬/cloud 무관하게 env 존재만으로 거부되므로, crc가 remote 세션 안에서 실행될 때 부모 env로 새어들지 않게 반드시 제거한다(`buildEnv`가 담당).
 - **Go 단일 바이너리 + bubbletea/lipgloss** — 배포 바이너리 하나, 실시간 상태판.
 - **포그라운드 모드** — 미심쩍을 때 백그라운드 대신 현재 터미널에 붙여 로그 보며 실행(`crc fg`).
+- **로그는 서버 화면이 아니라 `--debug-file`로 받는다** — 서버 stdout을 파일로 받던 방식은 실측에서 1.46MB 파일의 고유한 줄이 11줄(663바이트)뿐이었다. 연결 상태 화면을 1초에 한 번꼴로 다시 그려 같은 6줄이 3,967번 쌓인 것으로, 12일이면 400MB 규모다. 게다가 세션이 안 붙은 서버는 화면을 다시 그릴 일이 없어 로그가 자라지 않으므로, "정상적으로 조용한 것"과 "멎어서 조용한 것"이 구분되지 않는다. `--debug-file`은 유휴여도 폴링 기록이 타임스탬프와 함께 남아 **마지막 기록 시각으로 서버가 언제까지 살아 움직였는지 판별**할 수 있고, 용량은 1/50 수준이다. 서버가 이어쓰기로 기록하므로 재시작 전 기록도 보존된다(무한 성장은 시작 시 상한 검사로 막는다). stdout은 버리되 **stderr는 남긴다** — 기동 거부(`Error: Remote Control is not available inside a cloud session.`) 같은 실패 원인이 나오는 유일한 곳이고, 정상 기동 시에는 비어 있다(실측).
 - **NFC 정규화** — macOS 파일명은 NFD(자모 분해)라 한글이 깨져 보이고 이름 매칭이 어긋난다. scan 후보 이름과 화면 표시(경로 포함)를 NFC로 정규화한다(`golang.org/x/text/unicode/norm`).
 
 ## 조사 결론 (4축)
@@ -30,14 +31,15 @@
 ```
 ~/.config/crc/workspaces.json    # 등록: { "workspaces": [{ "name": "...", "path": "..." }] }
 ~/.local/state/crc/<name>.pid    # 실행 중 PID
-~/.local/state/crc/<name>.log    # stdout+stderr
+~/.local/state/crc/<name>.log    # 서버 진단 로그 (서버가 --debug-file로 직접 기록)
+~/.local/state/crc/<name>.err    # 서버 stderr (기동 실패 원인)
 ```
 
 config는 temp 파일 → rename으로 atomic하게 쓴다(토글마다 갱신되므로 크래시에 파일이 깨지지 않게). config 디렉토리는 `XDG_CONFIG_HOME` 존중, 권한 `0700`.
 
 ### 프로세스 생명주기
 
-- **시작**: `exec.Command("claude","remote-control","--name",name)`, `cmd.Dir=path`, `Env += CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE=1`, stdout/stderr→로그, `SysProcAttr{Setsid:true}`(부모 죽어도 생존), PID 기록.
+- **시작**: `exec.Command("claude","remote-control","--name",name,"--debug-file",logPath)`, `cmd.Dir=path`, `Env += CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE=1`, stdout은 버리고 stderr는 `<name>.err`로, `SysProcAttr{Setsid:true}`(부모 죽어도 생존), PID 기록.
 - **판정**: PID `kill(pid,0)` → running / stopped / dead(pid 있으나 프로세스 없음=조기종료). **단 `kill(0)`은 좀비도 통과**하므로, crc가 `Setsid` 자식을 wait하지 않아 생기는 좀비를 running으로 오판하지 않도록 darwin은 `sysctl("kern.proc.pid")`의 `P_stat==SZOMB`로 좀비를 감지해 **dead로 판정**한다(그 외 플랫폼은 signal 0만; `proc_darwin.go`/`proc_other.go`로 분리).
 - **업타임**: running이면 pid 파일 mtime(=시작 시각) 기준 경과 시간을 파생 표시(`Uptime`).
 - **정지**: SIGTERM→(잔존 시)SIGKILL, pid 정리.

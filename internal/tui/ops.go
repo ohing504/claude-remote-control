@@ -46,7 +46,7 @@ func (m model) foreground() (tea.Model, tea.Cmd) {
 	}
 	s := server.Server{Name: r.ws.Name, Path: r.ws.Path}
 	dir := m.dir
-	return m, tea.ExecProcess(s.Command(), func(error) tea.Msg {
+	return m, tea.ExecProcess(s.Command(""), func(error) tea.Msg {
 		rows, err := loadRows(dir)
 		return refreshMsg{rows: rows, err: err}
 	})

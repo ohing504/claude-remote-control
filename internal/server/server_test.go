@@ -47,7 +47,7 @@ func TestBuildEnvAbsoluteRule(t *testing.T) {
 // command()가 올바른 인자·작업 디렉토리·env를 구성하는지.
 func TestCommand(t *testing.T) {
 	s := Server{Name: "proj-a", Path: "/tmp/proj-a"}
-	cmd := s.Command()
+	cmd := s.Command("")
 
 	wantArgs := []string{"claude", "remote-control", "--name", "proj-a"}
 	if !slices.Equal(cmd.Args, wantArgs) {
@@ -72,13 +72,14 @@ func TestLifecycleWithRealProcess(t *testing.T) {
 	}
 
 	cmd := exec.Command("sleep", "30")
-	if err := startDetached(cmd, pidPath, logPath); err != nil {
+	if err := startDetached(cmd, pidPath, logPath, state.ErrPath(dir, "x")); err != nil {
 		t.Fatalf("startDetached: %v", err)
 	}
 	t.Cleanup(func() { _ = Stop(pidPath) }) // 실패해도 프로세스 정리
 
-	if _, err := os.Stat(logPath); err != nil {
-		t.Fatalf("로그 파일 미생성: %v", err)
+	// 진단 로그는 서버가 --debug-file로 직접 쓴다. crc가 만드는 건 stderr 파일이다.
+	if _, err := os.Stat(state.ErrPath(dir, "x")); err != nil {
+		t.Fatalf("stderr 파일 미생성: %v", err)
 	}
 	if got := Status(pidPath); got != Running {
 		t.Fatalf("시작 후 %v, Running 기대", got)
@@ -115,7 +116,7 @@ func TestStopIdempotentishOnFastExit(t *testing.T) {
 	logPath := state.LogPath(dir, "y")
 
 	cmd := exec.Command("true") // 즉시 종료
-	if err := startDetached(cmd, pidPath, logPath); err != nil {
+	if err := startDetached(cmd, pidPath, logPath, state.ErrPath(dir, "y")); err != nil {
 		t.Fatalf("startDetached: %v", err)
 	}
 	time.Sleep(50 * time.Millisecond) // 종료 대기
@@ -146,7 +147,7 @@ func TestUptime(t *testing.T) {
 	dir := t.TempDir()
 	pidPath := state.PidPath(dir, "u")
 	cmd := exec.Command("sleep", "30")
-	if err := startDetached(cmd, pidPath, state.LogPath(dir, "u")); err != nil {
+	if err := startDetached(cmd, pidPath, state.LogPath(dir, "u"), state.ErrPath(dir, "u")); err != nil {
 		t.Fatalf("startDetached: %v", err)
 	}
 	t.Cleanup(func() { _ = Stop(pidPath) })
@@ -166,7 +167,7 @@ func TestZombieDetectedAsDead(t *testing.T) {
 	dir := t.TempDir()
 	pidPath := state.PidPath(dir, "z")
 	cmd := exec.Command("true") // 즉시 종료
-	if err := startDetached(cmd, pidPath, state.LogPath(dir, "z")); err != nil {
+	if err := startDetached(cmd, pidPath, state.LogPath(dir, "z"), state.ErrPath(dir, "z")); err != nil {
 		t.Fatalf("startDetached: %v", err)
 	}
 	t.Cleanup(func() { _ = Stop(pidPath) })
@@ -244,5 +245,87 @@ func TestRestartFromStopped(t *testing.T) {
 
 	if got := Status(pidPath); got != Running {
 		t.Fatalf("%v, Running 기대", got)
+	}
+}
+
+// Start 경로의 커맨드에 --debug-file이 붙고, fg 경로에는 안 붙는지.
+func TestCommandDebugFile(t *testing.T) {
+	s := Server{Name: "proj-a", Path: "/tmp/proj-a"}
+
+	want := []string{"claude", "remote-control", "--name", "proj-a", "--debug-file", "/tmp/s/proj-a.log"}
+	if got := s.Command("/tmp/s/proj-a.log").Args; !slices.Equal(got, want) {
+		t.Fatalf("Args=%v, %v 기대", got, want)
+	}
+	// fg는 화면을 눈앞에서 보므로 진단 파일을 지정하지 않는다.
+	if got := s.Command("").Args; slices.Contains(got, "--debug-file") {
+		t.Fatalf("fg 커맨드에 --debug-file이 붙음: %v", got)
+	}
+}
+
+// 서버 stdout은 버리고 stderr만 <name>.err에 남기는지.
+func TestStartDropsStdoutKeepsStderr(t *testing.T) {
+	dir := t.TempDir()
+	pidPath := state.PidPath(dir, "x")
+	logPath := state.LogPath(dir, "x")
+	errPath := state.ErrPath(dir, "x")
+
+	cmd := exec.Command("sh", "-c", "echo 화면반복; echo 기동실패 1>&2")
+	if err := startDetached(cmd, pidPath, logPath, errPath); err != nil {
+		t.Fatalf("startDetached: %v", err)
+	}
+	t.Cleanup(func() { _ = Stop(pidPath) })
+	time.Sleep(200 * time.Millisecond)
+
+	gotErr, err := os.ReadFile(errPath)
+	if err != nil {
+		t.Fatalf("err 파일 미생성: %v", err)
+	}
+	if !strings.Contains(string(gotErr), "기동실패") {
+		t.Fatalf("stderr 내용이 없음: %q", gotErr)
+	}
+	if strings.Contains(string(gotErr), "화면반복") {
+		t.Fatalf("stdout이 err 파일에 섞임: %q", gotErr)
+	}
+	// stdout은 버려지므로 crc가 로그 파일을 만들지 않는다(서버가 --debug-file로 직접 쓴다).
+	if _, err := os.Stat(logPath); !os.IsNotExist(err) {
+		t.Fatal("crc가 로그 파일을 만들었다 — 서버가 쓸 파일이다")
+	}
+}
+
+// 로그 디렉토리 총량이 상한을 넘으면 시작 시 비우고, 넘지 않으면 그대로 두는지(이어쓰기 보존).
+func TestStartTrimsOversizedLogDir(t *testing.T) {
+	dir := t.TempDir()
+	big := state.LogPath(dir, "big")
+	small := state.LogPath(dir, "small")
+	for _, p := range []string{big, small} {
+		if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// 상한 초과는 세션 로그가 함께 쌓인 상황을 흉내 낸다(파일 여러 개의 합).
+	if err := os.WriteFile(big, make([]byte, maxLogBytes/2+1), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(filepath.Dir(big), "session.log"), make([]byte, maxLogBytes/2+1), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(small, []byte("이전 실행 기록\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	for name, path := range map[string]string{"big": big, "small": small} {
+		pidPath := state.PidPath(dir, name)
+		cmd := exec.Command("sleep", "30")
+		if err := startDetached(cmd, pidPath, path, state.ErrPath(dir, name)); err != nil {
+			t.Fatalf("startDetached(%s): %v", name, err)
+		}
+		t.Cleanup(func() { _ = Stop(pidPath) })
+	}
+
+	if _, err := os.Stat(big); !os.IsNotExist(err) {
+		t.Fatal("상한 초과 로그 디렉토리가 안 비워짐")
+	}
+	if b, err := os.ReadFile(small); err != nil || !strings.Contains(string(b), "이전 실행 기록") {
+		t.Fatalf("상한 이하 로그가 사라짐: %q, %v", b, err)
 	}
 }

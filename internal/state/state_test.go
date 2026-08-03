@@ -22,8 +22,11 @@ func TestPathHelpers(t *testing.T) {
 	if got, want := PidPath(dir, "a"), filepath.Join("/s", "a.pid"); got != want {
 		t.Fatalf("PidPath=%q, %q 기대", got, want)
 	}
-	if got, want := LogPath(dir, "a"), filepath.Join("/s", "a.log"); got != want {
+	if got, want := LogPath(dir, "a"), filepath.Join("/s", "logs", "a", "server.log"); got != want {
 		t.Fatalf("LogPath=%q, %q 기대", got, want)
+	}
+	if got, want := ErrPath(dir, "a"), filepath.Join("/s", "logs", "a", "server.err"); got != want {
+		t.Fatalf("ErrPath=%q, %q 기대", got, want)
 	}
 }
 
