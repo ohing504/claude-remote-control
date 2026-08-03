@@ -1,0 +1,24 @@
+# dead(pid 파일만 남고 프로세스 없음) 정리 E2E.
+
+mkdir ws-a
+exec crc add ws-a proj-a
+
+# 존재하지 않는 PID를 심어 dead 상태를 만든다.
+mkdir $WORK/state/crc
+cp deadpid $WORK/state/crc/proj-a.pid
+exec crc ls
+stdout 'dead'
+
+# down이 dead를 정리한다(예전엔 running이 아니면 건너뛰어 영원히 dead였다).
+exec crc down proj-a
+stdout '정리: proj-a'
+exec crc ls
+stdout 'stopped'
+
+# 이미 stopped면 조용히 넘어간다.
+exec crc down proj-a
+! stdout '정리'
+! stdout '정지'
+
+-- deadpid --
+999999

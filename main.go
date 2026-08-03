@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"time"
 
 	"golang.org/x/text/unicode/norm"
 
@@ -194,7 +195,10 @@ func cmdUp(names []string) error {
 	if err != nil {
 		return err
 	}
-	for _, ws := range targets {
+	for i, ws := range targets {
+		if i > 0 {
+			time.Sleep(server.StartInterval) // 등록 요청이 몰리면 429로 거부된다
+		}
 		s := server.Server{Name: ws.Name, Path: ws.Path}
 		if err := s.Start(dir); err != nil {
 			fmt.Fprintf(os.Stderr, "  %s: %v\n", ws.Name, err)
@@ -219,11 +223,16 @@ func cmdDown(names []string) error {
 		return err
 	}
 	for _, ws := range targets {
-		if server.Status(state.PidPath(dir, ws.Name)) != server.Running {
+		st := server.Status(state.PidPath(dir, ws.Name))
+		if st == server.Stopped {
 			continue // 안 떠 있으면 조용히 건너뜀
 		}
 		if err := server.StopByName(dir, ws.Name); err != nil {
 			fmt.Fprintf(os.Stderr, "  %s: %v\n", ws.Name, err)
+			continue
+		}
+		if st == server.Dead {
+			fmt.Printf("정리: %s\n", ws.Name) // 프로세스는 이미 없고 pid 파일만 남았던 경우
 			continue
 		}
 		fmt.Printf("정지: %s\n", ws.Name)

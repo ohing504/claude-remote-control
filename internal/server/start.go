@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"syscall"
+	"time"
 
 	"crc/internal/state"
 )
@@ -15,6 +16,11 @@ import (
 // 이어쓰고 세션마다 로그를 새로 만들어 그대로 두면 무한히 자란다. 시작 시 총량이
 // 이 크기를 넘으면 디렉토리를 비운다.
 const maxLogBytes = 5 << 20
+
+// StartInterval은 여러 서버를 연달아 띄울 때 시작 사이에 두는 간격이다. 등록 요청이
+// 몰리면 claude 쪽이 429로 거부한다(실측: 9개를 한꺼번에 띄우자 4개가
+// `Registration: Rate limited (429)`로 조기 종료).
+const StartInterval = time.Second
 
 // Command는 실행할 claude remote-control 커맨드를 구성한다(env 절대 규칙 적용).
 // debugFile이 비어 있지 않으면 서버가 그 경로에 진단 로그를 기록한다. 포그라운드

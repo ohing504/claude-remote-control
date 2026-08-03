@@ -160,14 +160,19 @@ func restartCmd(dir string, r row) tea.Cmd {
 // allCmd는 전체를 시작(up)하거나 정지(down)한다.
 func allCmd(dir string, rows []row, up bool) tea.Cmd {
 	return func() tea.Msg {
+		started := 0
 		for _, r := range rows {
 			if up {
 				if r.st != server.Running {
+					if started > 0 {
+						time.Sleep(server.StartInterval) // 등록 요청이 몰리면 429로 거부된다
+					}
 					s := server.Server{Name: r.ws.Name, Path: r.ws.Path}
 					_ = s.Start(dir)
+					started++
 				}
-			} else if r.st == server.Running {
-				_ = server.StopByName(dir, r.ws.Name)
+			} else if r.st != server.Stopped {
+				_ = server.StopByName(dir, r.ws.Name) // dead도 pid 파일을 정리한다
 			}
 		}
 		rows, err := loadRows(dir)
