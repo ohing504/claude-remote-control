@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"syscall"
 	"time"
@@ -14,7 +15,8 @@ import (
 
 // maxLogBytes는 서버 하나의 로그 디렉토리 총량 상한이다. 서버가 진단 로그를
 // 이어쓰고 세션마다 로그를 새로 만들어 그대로 두면 무한히 자란다. 시작 시 총량이
-// 이 크기를 넘으면 디렉토리를 비운다.
+// 이 크기를 넘으면 오래된 파일부터 지운다. 실행 중에는 검사하지 않으므로 오래
+// 켜둔 서버는 다시 띄울 때까지 줄지 않는다.
 const maxLogBytes = 5 << 20
 
 // StartInterval은 여러 서버를 연달아 띄울 때 시작 사이에 두는 간격이다. 등록 요청이
@@ -102,23 +104,49 @@ func startDetached(cmd *exec.Cmd, pidPath, logPath, errPath string) error {
 	_ = errFile.Close()
 
 	pid := strconv.Itoa(cmd.Process.Pid)
-	return os.WriteFile(pidPath, []byte(pid+"\n"), 0o600)
+	if err := os.WriteFile(pidPath, []byte(pid+"\n"), 0o600); err != nil {
+		// pid를 기록하지 못하면 crc가 이 서버를 추적할 수 없다(down이나 status에 안 잡힌다).
+		// 추적 불가능한 서버를 남기느니 방금 띄운 프로세스를 정리한다.
+		_ = cmd.Process.Kill()
+		return err
+	}
+	return nil
 }
 
-// trimOversizedLogDir은 총량이 상한을 넘은 로그 디렉토리를 비운다. 상한 이하면
-// 그대로 둬 재시작 전 기록을 보존한다(서버가 진단 로그를 이어쓴다).
+// trimOversizedLogDir은 총량이 상한을 넘으면 오래된 파일부터 지워 상한 이하로
+// 만든다. 세션 로그와 브리지 트랜스크립트가 함께 쌓이는데, 디렉토리를 통째로
+// 지우면 방금까지 쓰던 진단 로그도 사라져 재시작 전 기록을 볼 수 없다.
+// 상한 이하면 아무것도 지우지 않는다(서버가 진단 로그를 이어쓴다).
 func trimOversizedLogDir(logDir string) {
 	entries, err := os.ReadDir(logDir)
 	if err != nil {
 		return
 	}
+	type logFile struct {
+		path    string
+		size    int64
+		modTime time.Time
+	}
+	files := make([]logFile, 0, len(entries))
 	var total int64
 	for _, e := range entries {
-		if fi, err := e.Info(); err == nil {
-			total += fi.Size()
+		fi, err := e.Info()
+		if err != nil {
+			continue
 		}
+		files = append(files, logFile{filepath.Join(logDir, e.Name()), fi.Size(), fi.ModTime()})
+		total += fi.Size()
 	}
-	if total > maxLogBytes {
-		_ = os.RemoveAll(logDir) // 실패해도 기동은 막지 않는다
+	if total <= maxLogBytes {
+		return
+	}
+	slices.SortFunc(files, func(a, b logFile) int { return a.modTime.Compare(b.modTime) })
+	for _, f := range files {
+		if total <= maxLogBytes {
+			return
+		}
+		if err := os.RemoveAll(f.path); err == nil { // 실패해도 기동은 막지 않는다
+			total -= f.size
+		}
 	}
 }

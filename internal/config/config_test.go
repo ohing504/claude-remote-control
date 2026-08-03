@@ -182,3 +182,27 @@ func TestUniqueName(t *testing.T) {
 		t.Fatalf("유니크하지 않은 이름 반환: %q", got)
 	}
 }
+
+// 이름은 pid·log 파일 경로가 되므로 경로를 벗어나는 문자를 거부하는지.
+func TestValidateNameRejectsPathEscapes(t *testing.T) {
+	bad := []string{"", " ", "..", "../x", "a/b", "a\\b", ".hidden", "x/../../y"}
+	for _, n := range bad {
+		if err := ValidateName(n); err == nil {
+			t.Errorf("이름 %q가 통과됨", n)
+		}
+	}
+	good := []string{"proj-a", "Second Brain", "한글이름", "a.b", "x_1"}
+	for _, n := range good {
+		if err := ValidateName(n); err != nil {
+			t.Errorf("정상 이름 %q가 거부됨: %v", n, err)
+		}
+	}
+}
+
+// Add가 이름 검증을 거치는지.
+func TestAddRejectsBadName(t *testing.T) {
+	c := &Config{}
+	if err := c.Add(Workspace{Name: "../escape", Path: "/tmp/x"}); err == nil {
+		t.Fatal("경로를 벗어나는 이름이 등록됨")
+	}
+}

@@ -31,15 +31,15 @@
 ```
 ~/.config/crc/workspaces.json    # 등록: { "workspaces": [{ "name": "...", "path": "..." }] }
 ~/.local/state/crc/<name>.pid    # 실행 중 PID
-~/.local/state/crc/<name>.log    # 서버 진단 로그 (서버가 --debug-file로 직접 기록)
-~/.local/state/crc/<name>.err    # 서버 stderr (기동 실패 원인)
+~/.local/state/crc/logs/<name>/server.log   # 서버 진단 로그 (서버가 --debug-file로 직접 기록)
+~/.local/state/crc/logs/<name>/server.err   # 서버 stderr (기동 실패 원인)
 ```
 
 config는 temp 파일 → rename으로 atomic하게 쓴다(토글마다 갱신되므로 크래시에 파일이 깨지지 않게). config 디렉토리는 `XDG_CONFIG_HOME` 존중, 권한 `0700`.
 
 ### 프로세스 생명주기
 
-- **시작**: `exec.Command("claude","remote-control","--name",name,"--debug-file",logPath)`, `cmd.Dir=path`, `Env += CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE=1`, stdout은 버리고 stderr는 `<name>.err`로, `SysProcAttr{Setsid:true}`(부모 죽어도 생존), PID 기록.
+- **시작**: `exec.Command("claude","remote-control","--name",name,"--debug-file",state.LogPath(dir,name))`, `cmd.Dir=path`, `Env += CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE=1`, stdout은 버리고 stderr는 `logs/<name>/server.err`로, `SysProcAttr{Setsid:true}`(부모 죽어도 생존), PID 기록.
 - **판정**: PID `kill(pid,0)` → running / stopped / dead(pid 있으나 프로세스 없음=조기종료). **단 `kill(0)`은 좀비도 통과**하므로, crc가 `Setsid` 자식을 wait하지 않아 생기는 좀비를 running으로 오판하지 않도록 darwin은 `sysctl("kern.proc.pid")`의 `P_stat==SZOMB`로 좀비를 감지해 **dead로 판정**한다(그 외 플랫폼은 signal 0만; `proc_darwin.go`/`proc_other.go`로 분리).
 - **업타임**: running이면 pid 파일 mtime(=시작 시각) 기준 경과 시간을 파생 표시(`Uptime`).
 - **정지**: SIGTERM→(잔존 시)SIGKILL, pid 정리.

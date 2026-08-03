@@ -322,12 +322,19 @@ func TestStartTrimsOversizedLogDir(t *testing.T) {
 		t.Cleanup(func() { _ = Stop(pidPath) })
 	}
 
-	// 디렉토리를 비운 뒤 빈 로그 파일만 다시 만든다.
-	if fi, err := os.Stat(big); err != nil || fi.Size() != 0 {
-		t.Fatalf("상한 초과 로그가 안 비워짐: size=%v, err=%v", fi, err)
+	// 오래된 파일부터 지워 총량이 상한 이하가 된다.
+	entries, err := os.ReadDir(filepath.Dir(big))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(filepath.Dir(big), "session.log")); !os.IsNotExist(err) {
-		t.Fatal("함께 쌓인 세션 로그가 안 지워짐")
+	var total int64
+	for _, e := range entries {
+		if fi, err := e.Info(); err == nil {
+			total += fi.Size()
+		}
+	}
+	if total > maxLogBytes {
+		t.Fatalf("정리 후에도 총량 %d가 상한 초과", total)
 	}
 	if b, err := os.ReadFile(small); err != nil || !strings.Contains(string(b), "이전 실행 기록") {
 		t.Fatalf("상한 이하 로그가 사라짐: %q, %v", b, err)
@@ -372,5 +379,64 @@ func TestStartKeepsExistingLogContent(t *testing.T) {
 	b, err := os.ReadFile(logPath)
 	if err != nil || !strings.Contains(string(b), "이전 실행 기록") {
 		t.Fatalf("이전 기록이 사라짐: %q, %v", b, err)
+	}
+}
+
+// pid 기록에 실패하면 이미 띄운 프로세스를 정리하는지. 그대로 두면 crc가
+// 추적하지 못하는 서버가 남아 down으로도 못 잡는다.
+func TestStartKillsProcessWhenPidWriteFails(t *testing.T) {
+	dir := t.TempDir()
+	// pid 경로의 부모를 파일로 만들어 쓰기를 실패시킨다.
+	blocker := filepath.Join(dir, "blocked")
+	if err := os.WriteFile(blocker, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	pidPath := filepath.Join(blocker, "x.pid")
+
+	cmd := exec.Command("sleep", "30")
+	err := startDetached(cmd, pidPath, state.LogPath(dir, "x"), state.ErrPath(dir, "x"))
+	if err == nil {
+		t.Fatal("pid 쓰기 실패인데 에러가 없음")
+	}
+	if cmd.Process == nil {
+		return // 프로세스가 안 떴으면 정리할 것도 없다
+	}
+	// 정리됐으면 살아 있지 않거나 좀비다.
+	time.Sleep(100 * time.Millisecond)
+	if syscall.Kill(cmd.Process.Pid, 0) == nil && !isZombie(cmd.Process.Pid) {
+		_ = cmd.Process.Kill()
+		t.Fatalf("프로세스 %d가 정리되지 않고 남음", cmd.Process.Pid)
+	}
+}
+
+// 상한 초과 시 오래된 파일부터 지워 최신 진단 로그는 남기는지.
+func TestTrimKeepsNewestLog(t *testing.T) {
+	dir := t.TempDir()
+	logDir := state.LogDir(dir, "x")
+	if err := os.MkdirAll(logDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	old := filepath.Join(logDir, "old-session.log")
+	newest := state.LogPath(dir, "x")
+	if err := os.WriteFile(old, make([]byte, maxLogBytes), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(newest, []byte("최신 진단 기록\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// old를 더 오래된 것으로 만든다.
+	past := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(old, past, past); err != nil {
+		t.Fatal(err)
+	}
+
+	trimOversizedLogDir(logDir)
+
+	if _, err := os.Stat(old); !os.IsNotExist(err) {
+		t.Fatal("오래된 파일이 안 지워짐")
+	}
+	b, err := os.ReadFile(newest)
+	if err != nil || !strings.Contains(string(b), "최신 진단 기록") {
+		t.Fatalf("최신 진단 로그가 사라짐: %q, %v", b, err)
 	}
 }

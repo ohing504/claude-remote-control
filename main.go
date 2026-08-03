@@ -150,12 +150,16 @@ func cmdRm(args []string) error {
 	if err != nil {
 		return err
 	}
-	if server.Status(state.PidPath(dir, name)) == server.Running {
+	// dead(프로세스는 없고 pid 파일만 남은 상태)도 정리해야 pid 파일과 로그가 안 남는다.
+	if server.Status(state.PidPath(dir, name)) != server.Stopped {
 		if err := server.StopByName(dir, name); err != nil {
 			return err
 		}
 		fmt.Printf("정지: %s\n", name)
 	}
+	// 등록을 지우면 로그도 남길 이유가 없다. 이름은 등록 시 ValidateName을 통과했으므로
+	// 경로 구분자나 선행 .이 없어 상태 디렉토리 밖을 가리키지 않는다.
+	_ = os.RemoveAll(state.LogDir(dir, name)) //nolint:gosec // 검증된 이름으로 구성한 상태 경로
 	if err := cfg.Remove(name); err != nil {
 		return err
 	}
@@ -197,13 +201,18 @@ func cmdUp(names []string) error {
 	}
 	started := 0
 	for _, ws := range targets {
+		// 이미 떠 있으면 기다릴 필요가 없으므로 간격 판단 전에 걸러낸다.
+		if server.Status(state.PidPath(dir, ws.Name)) == server.Running {
+			fmt.Fprintf(os.Stderr, "  %s: 이미 실행 중\n", ws.Name)
+			continue
+		}
 		if started > 0 {
 			time.Sleep(server.StartInterval) // 등록 요청이 몰리면 429로 거부된다
 		}
 		s := server.Server{Name: ws.Name, Path: ws.Path}
 		if err := s.Start(dir); err != nil {
 			fmt.Fprintf(os.Stderr, "  %s: %v\n", ws.Name, err)
-			continue // 이미 떠 있어 건너뛴 경우까지 기다리지 않는다
+			continue
 		}
 		started++
 		fmt.Printf("시작: %s\n", ws.Name)

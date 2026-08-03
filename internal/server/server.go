@@ -141,8 +141,15 @@ func Stop(pidPath string) error {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	// 잔존 시 강제 종료.
+	// 잔존 시 강제 종료. 곧바로 반환하면 재시작이 아직 살아 있는 서버 위에 새 서버를
+	// 띄워 같은 이름으로 두 개가 등록을 시도한다(등록이 429로 거부될 수 있다).
 	_ = proc.Signal(syscall.SIGKILL)
+	for i := 0; i < 10; i++ {
+		if !processAlive(pid) {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 	_ = os.Remove(pidPath)
 	return nil
 }
