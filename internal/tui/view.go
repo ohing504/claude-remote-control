@@ -83,7 +83,7 @@ func (m model) listView() string {
 			"삭제할까요? "+m.rows[m.cursor].ws.Name+" — y 확인 / 그 외 취소"))
 	} else {
 		b.WriteString("\n" + helpStyle.Render(
-			"↑↓/jk 이동 · ↵ 토글 · l 로그 · a 추가 · d 삭제 · f fg · A 전체시작 · x 전체정지 · r 새로고침 · q 종료"))
+			"↑↓/jk 이동 · ↵ 토글 · l 로그 · a 추가 · d 삭제 · f fg · A 전체시작 · x 전체정지 · r 재시작 · q 종료"))
 	}
 	if m.err != nil {
 		b.WriteString("\n" + errStyle.Render("에러: "+m.err.Error()))

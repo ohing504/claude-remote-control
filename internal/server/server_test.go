@@ -5,7 +5,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -178,4 +180,69 @@ func TestZombieDetectedAsDead(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 	t.Fatalf("좀비를 Dead로 판정하지 못함(status=%v)", Status(pidPath))
+}
+
+// Restart가 떠 있던 프로세스를 죽이고 새 프로세스로 갈아끼우는지.
+// claude 대신 PATH 앞단에 sleep을 실행하는 가짜 claude를 놓고 검증한다.
+func TestRestartReplacesProcess(t *testing.T) {
+	dir := t.TempDir()
+	bin := t.TempDir()
+	script := "#!/bin/sh\nexec sleep 30\n"
+	if err := os.WriteFile(filepath.Join(bin, "claude"), []byte(script), 0o700); err != nil { //nolint:gosec // 테스트용 실행 스크립트
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	s := Server{Name: "x", Path: dir}
+	if err := s.Start(dir); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	pidPath := state.PidPath(dir, "x")
+	t.Cleanup(func() { _ = Stop(pidPath) })
+
+	first, err := os.ReadFile(pidPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.Restart(dir); err != nil {
+		t.Fatalf("Restart: %v", err)
+	}
+	second, err := os.ReadFile(pidPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(second) == string(first) {
+		t.Fatalf("pid가 그대로다: %s", second)
+	}
+	if got := Status(pidPath); got != Running {
+		t.Fatalf("재시작 후 %v, Running 기대", got)
+	}
+
+	// crc는 자식을 wait하지 않아 종료한 프로세스가 좀비로 남는다. 좀비는 죽은 것으로 본다.
+	old, _ := strconv.Atoi(strings.TrimSpace(string(first)))
+	if err := syscall.Kill(old, 0); err == nil && !isZombie(old) {
+		t.Fatalf("이전 프로세스 %d가 살아 있다", old)
+	}
+}
+
+// 안 떠 있는 서버에 Restart를 걸면 그냥 시작되는지.
+func TestRestartFromStopped(t *testing.T) {
+	dir := t.TempDir()
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "claude"), []byte("#!/bin/sh\nexec sleep 30\n"), 0o700); err != nil { //nolint:gosec // 테스트용 실행 스크립트
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	s := Server{Name: "x", Path: dir}
+	if err := s.Restart(dir); err != nil {
+		t.Fatalf("Restart: %v", err)
+	}
+	pidPath := state.PidPath(dir, "x")
+	t.Cleanup(func() { _ = Stop(pidPath) })
+
+	if got := Status(pidPath); got != Running {
+		t.Fatalf("%v, Running 기대", got)
+	}
 }

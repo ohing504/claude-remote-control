@@ -138,6 +138,17 @@ func toggleCmd(dir string, r row) tea.Cmd {
 	}
 }
 
+// restartCmd는 선택 행을 정지 후 다시 띄운다. 프로세스는 살아 있는데 응답만 멎은
+// 서버를 되살리는 조작이라 stopped 상태에서도 그냥 시작으로 동작한다.
+func restartCmd(dir string, r row) tea.Cmd {
+	return func() tea.Msg {
+		s := server.Server{Name: r.ws.Name, Path: r.ws.Path}
+		_ = s.Restart(dir)
+		rows, err := loadRows(dir)
+		return refreshMsg{rows: rows, err: err}
+	}
+}
+
 // allCmd는 전체를 시작(up)하거나 정지(down)한다.
 func allCmd(dir string, rows []row, up bool) tea.Cmd {
 	return func() tea.Msg {
@@ -239,7 +250,9 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "l":
 		return m.enterLog()
 	case "r":
-		return m, refreshCmd(m.dir)
+		if len(m.rows) > 0 {
+			return m, restartCmd(m.dir, m.rows[m.cursor])
+		}
 	}
 	return m, nil
 }

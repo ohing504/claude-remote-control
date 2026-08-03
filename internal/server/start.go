@@ -29,6 +29,13 @@ func (s Server) Start(dir string) error {
 	return startDetached(s.Command(), pidPath, state.LogPath(dir, s.Name))
 }
 
+// Restart는 떠 있으면 정지한 뒤 다시 띄운다. 응답이 멎은 서버를 되살리는 게 주 용도라
+// 정지 실패(이미 죽었거나 pid 파일만 남은 경우)는 무시하고 시작으로 넘어간다.
+func (s Server) Restart(dir string) error {
+	_ = StopByName(dir, s.Name)
+	return s.Start(dir)
+}
+
 // Foreground는 서버를 현재 터미널에 붙여(blocking) 실행한다. 미심쩍을 때 로그를
 // 눈앞에서 보며 띄우는 용도라 detached하지 않고 pid 파일도 만들지 않는다.
 // 이미 detached로 떠 있으면 중복 기동을 거부한다.
