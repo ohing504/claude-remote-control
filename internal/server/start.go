@@ -29,7 +29,10 @@ const StartInterval = time.Second
 // 실행(tea.ExecProcess)은 화면을 눈앞에서 보므로 빈 문자열을 넘긴다.
 func (s Server) Command(debugFile string) *exec.Cmd {
 	// s.Name은 사용자가 등록한 워크스페이스 이름 — 프로세스 실행이 이 도구의 목적이다.
-	args := []string{"remote-control", "--name", s.Name}
+	// --no-create-session-in-dir: `claude remote-control`의 기본 동작(시작 시 빈 세션
+	// 하나를 미리 만들어 둠)을 끈다. 세션은 폰이나 데스크탑에서 "새 세션"으로 직접
+	// 만들어 쓰므로 미리 만든 빈 세션은 목록에 쌓이기만 하고 쓰이지 않는다.
+	args := []string{"remote-control", "--name", s.Name, "--no-create-session-in-dir"}
 	if debugFile != "" {
 		args = append(args, "--debug-file", debugFile)
 	}

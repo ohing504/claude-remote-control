@@ -49,7 +49,7 @@ func TestCommand(t *testing.T) {
 	s := Server{Name: "proj-a", Path: "/tmp/proj-a"}
 	cmd := s.Command("")
 
-	wantArgs := []string{"claude", "remote-control", "--name", "proj-a"}
+	wantArgs := []string{"claude", "remote-control", "--name", "proj-a", "--no-create-session-in-dir"}
 	if !slices.Equal(cmd.Args, wantArgs) {
 		t.Fatalf("Args=%v, %v 기대", cmd.Args, wantArgs)
 	}
@@ -252,7 +252,7 @@ func TestRestartFromStopped(t *testing.T) {
 func TestCommandDebugFile(t *testing.T) {
 	s := Server{Name: "proj-a", Path: "/tmp/proj-a"}
 
-	want := []string{"claude", "remote-control", "--name", "proj-a", "--debug-file", "/tmp/s/proj-a.log"}
+	want := []string{"claude", "remote-control", "--name", "proj-a", "--no-create-session-in-dir", "--debug-file", "/tmp/s/proj-a.log"}
 	if got := s.Command("/tmp/s/proj-a.log").Args; !slices.Equal(got, want) {
 		t.Fatalf("Args=%v, %v 기대", got, want)
 	}
