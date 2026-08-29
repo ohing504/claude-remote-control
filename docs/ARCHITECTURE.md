@@ -56,6 +56,18 @@ cmd.Start()
 os.WriteFile(pidPath, []byte(strconv.Itoa(cmd.Process.Pid)), 0644)
 ```
 
+### 서버 종료가 세션에 미치는 영향 (실측 2026-08-29)
+
+crc는 서버 프로세스만 관리하고 세션 수명은 `claude remote-control`이 정한다. 그 경계에서 무슨 일이 벌어지는지 로그로 확인한 결과다.
+
+- **네트워크 두절만으로는 세션이 죽지 않는다.** 맥이 오프라인된 2시간 3분 동안 `[bridge:heartbeat] Failed ... getaddrinfo ENOTFOUND api.anthropic.com`이 67회 쌓였지만 서버도 세션도 살아 있었다.
+- **세션을 끊는 것은 프로세스 종료다.** 서버가 SIGTERM을 받으면 `[bridge:shutdown]`이 활성 세션에 SIGTERM을 보내고, 그 환경의 모든 세션에 `POST /v1/sessions/<id>/archive`를, 이어서 `DELETE /v1/environments/bridge/<id>`를 보낸 뒤 `bridge-pointer.json`을 비운다. 맥 종료, 맥 재시작, `crc down`, `crc` 재시작이 모두 이 경로다.
+- **다시 띄우면 새 환경과 새 세션이 만들어진다.** 재기동한 서버는 `POST /v1/environments/bridge`로 새 `environment_id`를 받는다. 폰과 웹 앱에 열려 있던 이전 세션 화면은 삭제된 환경을 가리키므로 `Remote Control disconnected — this session was ended or archived from another device or app (code 4090)`으로 남고 재연결되지 않는다.
+- **대화 내용은 로컬에 남는다.** `~/.claude/projects/<경로-슬러그>/<uuid>.jsonl`은 종료와 무관하게 보존되고, 새 세션에서 resume으로 이어붙일 수 있다(실측 확인).
+- **꺼진 서버로 보낸 명령은 오류 없이 사라진다**(사용자 보고, 로그 미확인). 앱 화면에는 마지막 상태만 남아 실패가 드러나지 않는다.
+
+**자동 기동과 감시는 지금 하지 않는다(보류, 2026-08-29).** launchd로 로그인 시 자동 기동하고 죽으면 되살리는 방식이 이 문제를 없애지만, 안 쓰는 워크스페이스 서버까지 항상 켜두게 된다. 수동 운영으로 불편이 쌓이는지 먼저 보고 재검토한다.
+
 ### CLAUDE.md 스캔
 
 `filepath.WalkDir`로 CLAUDE.md/.claude 있는 디렉토리 수집. fd/find 불필요(macOS 실측 홈 스캔 0.15초대).
