@@ -1,0 +1,28 @@
+# dead면 ls·status가 server.err의 마지막 줄을 종료 원인으로 덧붙인다.
+
+mkdir ws-a ws-b
+exec crc add ws-a proj-a
+exec crc add ws-b proj-b
+
+mkdir $WORK/state/crc/logs/proj-a
+cp deadpid $WORK/state/crc/proj-a.pid
+cp server.err $WORK/state/crc/logs/proj-a/server.err
+
+exec crc ls
+stdout '└ Error: Workspace not trusted'
+! stdout 'first line'
+
+exec crc status
+stdout '└ Error: Workspace not trusted'
+
+# 원인 기록이 없는 dead는 줄을 덧붙이지 않는다.
+cp deadpid $WORK/state/crc/proj-b.pid
+exec crc ls
+stdout -count=1 '└'
+
+-- deadpid --
+999999
+-- server.err --
+first line
+Error: Workspace not trusted. Please run `claude` first.
+

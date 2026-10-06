@@ -2,6 +2,8 @@ package tui
 
 import (
 	"bytes"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -9,6 +11,7 @@ import (
 	"github.com/charmbracelet/x/exp/teatest"
 
 	"crc/internal/config"
+	"crc/internal/state"
 )
 
 // 등록 두 개를 격리 환경에 심고 model을 만든다.
@@ -70,5 +73,41 @@ func TestCursorClamped(t *testing.T) {
 	nm, _ = nm.(model).handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
 	if got := nm.(model).cursor; got != 1 {
 		t.Fatalf("맨 아래에서 j 반복, cursor=%d, 1 기대", got)
+	}
+}
+
+// 커서 행이 dead면 종료 원인을, 기록이 없으면 안내를 표시하는지.
+func TestDeadCursorShowsExitReason(t *testing.T) {
+	m := newTestModel(t)
+	for _, name := range []string{"proj-a", "proj-b"} {
+		if err := os.MkdirAll(state.LogDir(m.dir, name), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(state.PidPath(m.dir, name), []byte("999999\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(state.ErrPath(m.dir, "proj-a"), []byte("Error: Workspace not trusted.\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var err error
+	if m.rows, err = loadRows(m.dir); err != nil {
+		t.Fatal(err)
+	}
+
+	if v := m.View(); !strings.Contains(v, "종료 원인: Error: Workspace not trusted.") {
+		t.Fatalf("proj-a 원인 미표시:\n%s", v)
+	}
+	m.cursor = 1
+	if v := m.View(); !strings.Contains(v, "종료 원인: 기록 없음") {
+		t.Fatalf("proj-b 안내 미표시:\n%s", v)
+	}
+}
+
+// 커서 행이 dead가 아니면 종료 원인 줄이 없는지.
+func TestStoppedCursorHasNoExitReason(t *testing.T) {
+	m := newTestModel(t)
+	if v := m.View(); strings.Contains(v, "종료 원인") {
+		t.Fatalf("stopped인데 원인 줄 표시:\n%s", v)
 	}
 }

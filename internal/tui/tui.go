@@ -35,8 +35,9 @@ const (
 )
 
 type row struct {
-	ws config.Workspace
-	st server.State
+	ws     config.Workspace
+	st     server.State
+	reason string // dead일 때만 채우는 종료 원인(server.err 마지막 줄)
 }
 
 // addCand는 추가 화면의 scan 후보 한 줄이다.
@@ -105,6 +106,9 @@ func loadRows(dir string) ([]row, error) {
 	rows := make([]row, len(cfg.Workspaces))
 	for i, ws := range cfg.Workspaces {
 		rows[i] = row{ws: ws, st: server.Status(state.PidPath(dir, ws.Name))}
+		if rows[i].st == server.Dead {
+			rows[i].reason = server.ExitReason(dir, ws.Name)
+		}
 	}
 	return rows, nil
 }
