@@ -95,6 +95,7 @@ func cmdLs() error {
 			}
 		}
 		fmt.Printf("%-20s %-8s %-8s %s\n", norm.NFC.String(ws.Name), st, up, norm.NFC.String(ws.Path))
+		printExitReason(dir, ws.Name, st)
 	}
 	return nil
 }
@@ -345,6 +346,17 @@ func cmdStatus() error {
 	for _, ws := range cfg.Workspaces {
 		st := server.Status(state.PidPath(dir, ws.Name))
 		fmt.Printf("%-20s %s\n", ws.Name, st)
+		printExitReason(dir, ws.Name, st)
 	}
 	return nil
+}
+
+// printExitReason은 dead 서버 아래에 종료 원인 한 줄을 덧붙인다(기록이 없으면 생략).
+func printExitReason(dir, name string, st server.State) {
+	if st != server.Dead {
+		return
+	}
+	if r := server.ExitReason(dir, name); r != "" {
+		fmt.Printf("  └ %s\n", r)
+	}
 }

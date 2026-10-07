@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/text/unicode/norm"
 
 	"crc/internal/server"
@@ -63,7 +64,14 @@ func (m model) listView() string {
 		b.WriteString("  (등록된 워크스페이스 없음 — crc add <path>)\n")
 	}
 	// 터미널 높이를 넘으면 커서 기준 창만 그린다(제목2 + 도움말2 + 여유).
-	start, end := windowBounds(m.cursor, len(m.rows), visibleCount(m.height, 5))
+	// 커서 행이 dead면 종료 원인 2줄(빈 줄 + 원인)을 더 뺀다.
+	reasonLine := ""
+	chrome := 5
+	if len(m.rows) > 0 && m.rows[m.cursor].st == server.Dead {
+		reasonLine = exitReasonLine(m.rows[m.cursor].reason, m.width)
+		chrome += 2
+	}
+	start, end := windowBounds(m.cursor, len(m.rows), visibleCount(m.height, chrome))
 	b.WriteString(moreHint(start, false))
 	for i := start; i < end; i++ {
 		prefix := "  "
@@ -77,6 +85,9 @@ func (m model) listView() string {
 		b.WriteString(line + "\n")
 	}
 	b.WriteString(moreHint(len(m.rows)-end, true))
+	if reasonLine != "" {
+		b.WriteString("\n" + errStyle.Render(reasonLine) + "\n")
+	}
 
 	switch {
 	case m.pendingDelete && len(m.rows) > 0:
@@ -193,6 +204,18 @@ func renderCand(c addCand, cursor bool) string {
 	default:
 		return line
 	}
+}
+
+// exitReasonLine은 dead 커서 행의 종료 원인을 터미널 폭 안의 한 줄로 만든다.
+func exitReasonLine(reason string, width int) string {
+	if reason == "" {
+		reason = "기록 없음 — l 로그"
+	}
+	line := "종료 원인: " + reason
+	if width > 0 {
+		line = ansi.Truncate(line, width, "…")
+	}
+	return line
 }
 
 func renderRow(r row, dir string) string {
