@@ -7,34 +7,34 @@ import (
 	"crc/internal/state"
 )
 
-// server.err의 공백이 아닌 마지막 줄을 종료 원인으로 돌려주는지.
-func TestExitReasonLastNonBlankLine(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.MkdirAll(state.LogDir(dir, "a"), 0o700); err != nil {
-		t.Fatal(err)
+// server.err의 공백이 아닌 마지막 줄을 종료 원인으로 돌려주고, 기록이 없으면 ""인지.
+func TestExitReason(t *testing.T) {
+	cases := []struct {
+		name string
+		body *string // nil이면 파일 없음
+		want string
+	}{
+		{"마지막 줄", ptr("warn: something\nError: Workspace not trusted.  \n\n  \n"), "Error: Workspace not trusted."},
+		{"한 줄", ptr("Error: x"), "Error: x"},
+		{"공백뿐", ptr("\n \n"), ""},
+		{"파일 없음", nil, ""},
 	}
-	body := "warn: something\nError: Workspace not trusted.  \n\n  \n"
-	if err := os.WriteFile(state.ErrPath(dir, "a"), []byte(body), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if got, want := ExitReason(dir, "a"), "Error: Workspace not trusted."; got != want {
-		t.Fatalf("%q, %q 기대", got, want)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if c.body != nil {
+				if err := os.MkdirAll(state.LogDir(dir, "a"), 0o700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(state.ErrPath(dir, "a"), []byte(*c.body), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if got := ExitReason(dir, "a"); got != c.want {
+				t.Fatalf("%q, %q 기대", got, c.want)
+			}
+		})
 	}
 }
 
-// server.err가 없거나 비어 있으면 빈 문자열.
-func TestExitReasonMissingOrEmpty(t *testing.T) {
-	dir := t.TempDir()
-	if got := ExitReason(dir, "none"); got != "" {
-		t.Fatalf("파일 없음: %q, 빈 문자열 기대", got)
-	}
-	if err := os.MkdirAll(state.LogDir(dir, "e"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(state.ErrPath(dir, "e"), []byte("\n \n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if got := ExitReason(dir, "e"); got != "" {
-		t.Fatalf("공백뿐: %q, 빈 문자열 기대", got)
-	}
-}
+func ptr(s string) *string { return &s }

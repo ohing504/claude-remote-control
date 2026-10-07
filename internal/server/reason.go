@@ -15,11 +15,6 @@ func ExitReason(dir, name string) string {
 	if err != nil {
 		return ""
 	}
-	lines := strings.Split(string(data), "\n")
-	for i := len(lines) - 1; i >= 0; i-- {
-		if l := strings.TrimSpace(lines[i]); l != "" {
-			return l
-		}
-	}
-	return ""
+	s := strings.TrimSpace(string(data))
+	return strings.TrimSpace(s[strings.LastIndexByte(s, '\n')+1:])
 }
