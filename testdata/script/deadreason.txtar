@@ -1,4 +1,4 @@
-# dead면 ls·status가 server.err의 마지막 줄을 종료 원인으로 덧붙인다.
+# dead면 ls와 status가 server.err의 마지막 줄을 종료 원인으로 덧붙인다.
 
 mkdir ws-a ws-b
 exec crc add ws-a proj-a

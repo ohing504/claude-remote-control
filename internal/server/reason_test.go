@@ -2,6 +2,7 @@ package server
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"crc/internal/state"
@@ -14,9 +15,12 @@ func TestExitReason(t *testing.T) {
 		body *string // nil이면 파일 없음
 		want string
 	}{
-		{"마지막 줄", ptr("warn: something\nError: Workspace not trusted.  \n\n  \n"), "Error: Workspace not trusted."},
-		{"한 줄", ptr("Error: x"), "Error: x"},
-		{"공백뿐", ptr("\n \n"), ""},
+		{"마지막 줄", new("warn: something\nError: Workspace not trusted.  \n\n  \n"), "Error: Workspace not trusted."},
+		{"한 줄", new("Error: x"), "Error: x"},
+		{"공백뿐", new("\n \n"), ""},
+		{"캐리지 리턴으로 덮어쓴 줄", new("Connecting...\rError: x\n"), "Error: x"},
+		{"ANSI 색 코드", new("\x1b[31mError: x\x1b[0m\n"), "Error: x"},
+		{"앞부분이 큰 파일", new(strings.Repeat("warn: noise\n", 10000) + "Error: x\n"), "Error: x"},
 		{"파일 없음", nil, ""},
 	}
 	for _, c := range cases {
@@ -36,5 +40,3 @@ func TestExitReason(t *testing.T) {
 		})
 	}
 }
-
-func ptr(s string) *string { return &s }
