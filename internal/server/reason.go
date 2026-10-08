@@ -15,8 +15,10 @@ import (
 // stderr를 많이 남긴 뒤 죽으면 커질 수 있다. TUI는 이 함수를 주기적으로 부른다.
 const exitReasonTailBytes = 4 << 10
 
-// ExitReason은 서버 stderr(server.err)의 공백이 아닌 마지막 줄을 돌려준다. dead 서버가
-// 왜 기동 직후 종료했는지(trust 미수락, 429 등) 보여주는 용도다. 기록이 없으면 "".
+// ExitReason은 서버 stderr(server.err)에서 "Error:"로 시작하는 마지막 줄을, 그런 줄이
+// 없으면 공백이 아닌 마지막 줄을 돌려준다. dead 서버가 왜 기동 직후 종료했는지(trust
+// 미수락, 429 등) 보여주는 용도다. 서버는 에러 뒤에 "Exiting in about 57 seconds." 같은
+// 안내 줄을 붙이기도 해서 마지막 줄만으로는 원인이 가려진다. 기록이 없으면 "".
 // 터미널 표시를 깨뜨리는 ANSI 시퀀스는 지우고, 캐리지 리턴으로 덮어쓴 줄은 마지막
 // 덮어쓴 내용만 남긴다.
 func ExitReason(dir, name string) string {
@@ -34,8 +36,19 @@ func ExitReason(dir, name string) string {
 	if err != nil {
 		return ""
 	}
-	s := strings.TrimSpace(ansi.Strip(string(data)))
-	s = s[strings.LastIndexByte(s, '\n')+1:]
-	s = s[strings.LastIndexByte(s, '\r')+1:]
-	return strings.TrimSpace(s)
+	last, lastErr := "", ""
+	for _, line := range strings.Split(ansi.Strip(string(data)), "\n") {
+		line = strings.TrimSpace(line[strings.LastIndexByte(line, '\r')+1:])
+		if line == "" {
+			continue
+		}
+		last = line
+		if strings.HasPrefix(line, "Error:") {
+			lastErr = line
+		}
+	}
+	if lastErr != "" {
+		return lastErr
+	}
+	return last
 }
